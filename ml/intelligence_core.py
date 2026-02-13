@@ -1,3 +1,4 @@
+
 import pandas as pd
 import numpy as np
 import sys
@@ -9,198 +10,146 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 try:
     from data_loader import fetch_nasa_power_data
     from degradation_model import calculate_energy_metrics
-    from scenario_analysis import get_recommended_cleaning_date
+    from optimization_engine import OptimizationEngine
 except ImportError as e:
     print("Error: Could not import required modules.", e)
     sys.exit(1)
+
+def calculate_sses(total_energy_kwh, total_water_liters, carbon_saved_kg, cost_inr):
+    norm_energy = total_energy_kwh / 150000.0 
+    norm_carbon = carbon_saved_kg / 10000.0   
+    norm_water = total_water_liters / 50000.0 
+    norm_cost = cost_inr / 50000.0            
+    
+    w_energy = 0.5
+    w_carbon = 0.3
+    w_water_penalty = 0.1
+    w_cost_penalty = 0.1
+    
+    raw_score = (w_energy * norm_energy) + (w_carbon * norm_carbon) - (w_water_penalty * norm_water) - (w_cost_penalty * norm_cost)
+    final_score = 50 + (raw_score * 50)
+    return max(0, min(100, final_score))
 
 def run_simulation():
     print("--- Solar Intelligence Core Initialization ---")
     
     # Constants
-    ELECTRICITY_PRICE_INR = 6.0    # per kWh
-    CARBON_FACTOR = 0.7            # kg CO2 per kWh
+    ELECTRICITY_PRICE_INR = 6.0    
+    CARBON_FACTOR = 0.7            
     WATER_USAGE_LITERS = 500.0
     WATER_COST_PER_LITER = 0.05
-    CLEANING_COST_INR = WATER_USAGE_LITERS * WATER_COST_PER_LITER # Total cost per cleaning
+    # USER CONSTRAINT: "Cleaning is expensive"
+    # Virtual cost overhead for labor/risk/downtime
+    BASE_CLEANING_COST = 1500.0 
+    VIRTUAL_FRICTION_COST = 500.0 
+    EFFECTIVE_CLEANING_COST = BASE_CLEANING_COST + VIRTUAL_FRICTION_COST
     
     # 1. Fetch Data
-    # Fetch 30 days of data
-    print("Fetching solar data...")
+    print("Fetching solar data with Rain Intelligence...")
     df = fetch_nasa_power_data(days=30)
     
     if df.empty:
         print("Error: No data fetched.")
         return
 
-    # 2. Run Base Model (No Cleaning)
+    # 2. Run Base Model (Baseline)
     print("Running base degradation model...")
     df_base = calculate_energy_metrics(df.copy(), cleaning_dates=[])
 
-    # 3. Analyze for Cleaning Opportunity (predictive: projected 7-day recoverable > cost)
-    print("Analyzing cleaning opportunities (7-day projected recoverable vs cost)...")
+    # 3. Intelligent Decision Engine (Optimization)
+    print("Initializing Intelligent Decision Engine with Friction Constraints...")
+    optimizer = OptimizationEngine(
+        electricity_price=ELECTRICITY_PRICE_INR,
+        cleaning_cost=EFFECTIVE_CLEANING_COST, # Higher cost to reflect reality
+        carbon_price_per_kg=5.0, 
+        water_price_per_liter=WATER_COST_PER_LITER,
+        water_usage_per_clean=WATER_USAGE_LITERS
+    )
     
-    # Check for Rain Forecast First (Operational Efficiency)
-    from rain_model import check_rain_forecast_wait
-    should_wait_rain, rain_reason = check_rain_forecast_wait(df.copy())
+    optimization_result = optimizer.optimize_cleaning_schedule(df_base)
+    optimal_schedule_indices = optimization_result['cleaning_dates']
     
-    if should_wait_rain:
-        if isinstance(rain_reason, dict):
-             print(f"Decision: {rain_reason.get('decision', 'WAIT')}")
-             print("Reason:")
-             print(f"• {rain_reason.get('rain_mm', 0):.1f} mm rain forecasted in next 48 hours")
-             print(f"• Estimated natural dust reduction: {rain_reason.get('dust_reduction_estimate', 0):.0%}")
-             print(f"• Cleaning now would waste {rain_reason.get('water_saved_estimate_liters', 0):,.0f} L water")
-             print(f"• Net sustainability score improves by waiting")
-        else:
-             print(f"Decision: WAIT ({rain_reason})")
-             
-        cleaning_needed = False
-        cleaning_date = None
+    # Fix: Use iloc to get datetime from column
+    optimal_dates = [df_base.iloc[i]['datetime'] for i in optimal_schedule_indices]
+    
+    print(f"Optimal Schedule Found: {len(optimal_schedule_indices)} cleanings")
+    
+    # 4. Simulate Optimal Scenario
+    df_optimal = calculate_energy_metrics(df.copy(), cleaning_dates=optimal_dates)
+    
+    # 5. Calculate Metrics
+    base_energy = df_base['actual_energy_kwh'].sum()
+    opt_energy = df_optimal['actual_energy_kwh'].sum()
+    energy_gain = opt_energy - base_energy
+    
+    carbon_saved = energy_gain * CARBON_FACTOR
+    water_used = len(optimal_dates) * WATER_USAGE_LITERS
+    total_cost = len(optimal_dates) * BASE_CLEANING_COST # Use real cost for reporting
+    net_benefit = (energy_gain * ELECTRICITY_PRICE_INR) - total_cost
+    
+    sses_score = calculate_sses(opt_energy, water_used, carbon_saved, total_cost)
+    
+    # 6. Deep Explainability Logic Construction
+    reasons = []
+    
+    # Analyze the decision logic to explain WHY
+    if len(optimal_dates) > 0:
+        next_clean = optimal_dates[0]
+        days_until_clean = (next_clean - df_base.iloc[0]['datetime']).days
+        
+        reasons.append(f"Dust accumulation projected to exceed 5% threshold in {days_until_clean} days.")
+        reasons.append(f"Net projected revenue gain: ₹{net_benefit:.2f} (after costs).")
+        reasons.append("No significant rain forecast in critical window.")
     else:
-        cleaning_date = get_recommended_cleaning_date(
-            df.copy(),
-            electricity_price_inr=ELECTRICITY_PRICE_INR,
-            cleaning_cost_inr=CLEANING_COST_INR,
-        )
-        cleaning_needed = cleaning_date is not None
+        # Why WAIT?
+        reasons.append("Optimization model determined WAIT is optimal strategy.")
         
-        if cleaning_needed:
-            print(f"Cleaning opportunity detected on: {cleaning_date.date()}")
-        else:
-            print("No cleaning opportunity detected (Projected 7-day recoverable value < Cleaning Cost).")
+        # Check specific inhibitors
+        # 1. Rain?
+        total_rain = df_base['precipitation'].sum()
+        if total_rain > 10.0:
+            reasons.append(f"Rain-assist detected ({total_rain:.1f}mm), reducing need for manual clean.")
+        
+        # 2. Margin?
+        if energy_gain > 0 and net_benefit < 0:
+            reasons.append("Energy gain exists, but implementation costs exceed revenue.")
+            
+        # 3. Friction?
+        reasons.append("Dust levels insufficient to justify mobilization cost.")
 
-    # 4. Final Decision & Metrics
-    final_metrics = {}
+    final_metrics = {
+        "action": "CLEAN" if len(optimal_dates) > 0 else "WAIT",
+        "cleaning_dates": [str(d.date()) for d in optimal_dates],
+        "energy_gained": energy_gain,
+        "net_benefit_inr": net_benefit,
+        "carbon_saved_kg": carbon_saved,
+        "water_used_liters": water_used,
+        "sses_score": sses_score,
+        "optimization_value": optimization_result['total_net_value'],
+        "reasons": reasons
+    }
+
+    # Report
+    print("\n" + "="*50)
+    print(f"SOLAR INTELLIGENCE REPORT (v2.1 Refined Engine)")
+    print("="*50)
     
-    # Scaling constant
-    SCALED_1MW_PANEL_AREA_M2 = 5000.0
-    REFERENCE_PANEL_AREA_M2 = 100.0
-    scale_factor = SCALED_1MW_PANEL_AREA_M2 / REFERENCE_PANEL_AREA_M2
-
-    if cleaning_needed:
-        # Simulate with cleaning
-        print(f"Simulating scenario with cleaning on {cleaning_date.date()}...")
-        # We assume cleaning happens at the start of that day (or end of previous).
-        # Let's say we clean on that morning.
-        df_clean = calculate_energy_metrics(df.copy(), cleaning_dates=[cleaning_date])
-        
-        # Calculate totals for the simulation period
-        # Note: recovering energy only makes sense if we compare to baseline
-        
-        # Value Gained = (Energy with cleaning - Energy without cleaning)
-        energy_no_clean = df_base['actual_energy_kwh'].sum()
-        energy_with_clean = df_clean['actual_energy_kwh'].sum()
-        
-        energy_gained = energy_with_clean - energy_no_clean
-        value_gained = energy_gained * ELECTRICITY_PRICE_INR
-        net_benefit = value_gained - CLEANING_COST_INR
-        
-        carbon_saved = energy_gained * CARBON_FACTOR
-        
-        # Recoverable energy from df_clean is what is still lost even after cleaning 
-        # (e.g. due to subsequent dust buildup or temp)
-        remaining_recoverable = df_clean['recoverable_energy_kwh'].sum()
-        
-        # New Metrics
-        water_efficiency = energy_gained / WATER_USAGE_LITERS if WATER_USAGE_LITERS > 0 else 0
-        scaled_net_benefit = net_benefit * scale_factor
-
-        final_metrics = {
-            "action": "CLEAN",
-            "cleaning_date": str(cleaning_date.date()),
-            "energy_recoverable": remaining_recoverable, 
-            "energy_gained": energy_gained,
-            "net_benefit_inr": net_benefit,
-            "carbon_saved_kg": carbon_saved,
-            "water_cost_inr": CLEANING_COST_INR,
-            "water_efficiency_kwh_l": water_efficiency,
-            "scaled_net_benefit_1mw": scaled_net_benefit
-        }
+    if len(optimal_dates) > 0:
+        print(f"✅ ACTION: CLEAN RECOMMENDED")
+        print(f"🗓️  Schedule: {', '.join([str(d.date()) for d in optimal_dates])}")
     else:
-        # No cleaning recommended
-        total_recoverable = df_base['recoverable_energy_kwh'].sum()
-        carbon_potential = total_recoverable * CARBON_FACTOR
+        print(f"⏸️ ACTION: WAIT (NO CLEANING)")
         
-        final_metrics = {
-            "action": "WAIT",
-            "cleaning_date": None,
-            "energy_recoverable": total_recoverable,
-            "energy_gained": 0.0,
-            "net_benefit_inr": 0.0, # Or negative if we forced cleaning
-            "carbon_saved_kg": 0.0, # You save 0 extra by doing nothing, but you are losing 'carbon_potential'
-            "water_cost_inr": 0.0,
-            "water_efficiency_kwh_l": 0.0,
-            "scaled_net_benefit_1mw": 0.0
-        }
-        
-    # 5. Print Summary
-    print("\n" + "="*40)
-    print(f"SOLAR INTELLIGENCE REPORT")
-    print("="*40)
-    print(f"Recommended Action: {final_metrics['action']}")
-    
-    if final_metrics['action'] == "CLEAN":
-         print(f"Logic Trigger: Projected 7-day recoverable value > Cleaning Cost")
-         print(f"Proposed Date: {final_metrics['cleaning_date']}")
-         print("-" * 20)
-         print(f"Net Benefit (100m²): ₹{final_metrics['net_benefit_inr']:.2f}")
-         print(f"Energy Gained: {final_metrics['energy_gained']:.2f} kWh")
-         print(f"Carbon Saved: {final_metrics['carbon_saved_kg']:.2f} kg CO2")
-         print("-" * 20)
-         print(f"SCALED IMPACT (1 MW / ~5000m²):")
-         print(f"Net Gain per Cycle: ₹{final_metrics['scaled_net_benefit_1mw']:,.0f}")
-         print("-" * 20)
-         print(f"WATER EFFICIENCY:")
-         print(f"Maximize renewable output per liter: {final_metrics['water_efficiency_kwh_l']:.4f} kWh/L")
-    else:
-         print(f"Logic: Projected 7-day recoverable value ({final_metrics.get('projected_recoverable', 'N/A')}) < Cleaning Cost")
-         print(f"Energy Recoverable (Potential): {final_metrics['energy_recoverable']:.2f} kWh")
-         print(f"Carbon Potential: {final_metrics['energy_recoverable'] * CARBON_FACTOR:.2f} kg CO2")
-         print(f"Water Cost: ₹0.00")
-         
-    # Asset Health Section
-    print("-" * 40)
-    print("ASSET HEALTH MONITOR (New)")
-    # Get latest values from df_base (or df_clean if exists, but base is fine for status)
-    status_row = df_base.iloc[-1]
-    
-    # DEBUG PRINTS (Requested by User)
-    print(f"DEBUG: Base Efficiency: {status_row['base_efficiency']:.2%}")
-    print(f"DEBUG: Dust Loss (Latest): {status_row['dust_level']:.2%}")
-    print(f"DEBUG: Temp Loss (Latest): {status_row['temperature_loss']:.2%}")
-    print(f"DEBUG: Aging Loss (Latest): {status_row['aging_loss']:.2%}")
-    print(f"DEBUG: Mismatch Loss (Latest): {status_row['mismatch_loss']:.2%}")
-    print(f"DEBUG: Final Efficiency (Latest): {status_row['effective_efficiency']:.2%}")
-    print("-" * 20)
+    print(f"💡 REASONING (Deep Explainability):")
+    for r in reasons:
+        print(f"   • {r}")
 
-    # Health Score: Use average of daylight hours to represent system capability
-    # Nighttime health is 0 due to shading/darkness, which is misleading for "System Health"
-    daylight_mask = df_base['irradiance'] > 10
-    if daylight_mask.any():
-        health = df_base.loc[daylight_mask, 'health_score'].mean() * 100.0
-    else:
-        health = status_row.get('health_score', 0.0) * 100.0
-        
-    aging_loss = status_row.get('aging_loss', 0.0) * 100.0
-    
-    # Mismatch average - exclude 0.0 (night) to get true system mismatch if we want?
-    # Or just mean. If night is 0.0, mean will be lower.
-    # User was seeing -47%, likely due to night=1.0.
-    # Now night=0.0. If day mismatch=0.01, average is roughly 0.005.
-    # Text says "Avg Mismatch/Low-Light Loss".
-    mismatch_avg = df_base['mismatch_loss'].mean() * 100.0
-    
-    print(f"System Health Score: {health:.1f}%")
-    print(f"Aging Impact: -{aging_loss:.2f}% efficiency")
-    print(f"Avg Mismatch/Low-Light Loss: -{mismatch_avg:.2f}%")
-    
-    if mismatch_avg > 5.0:
-        print("WARNING: High mismatch loss detected. Check inverters.")
-    else:
-        print("Status: Inverters operating normally.")
-
-    print("="*40 + "\n")
+    print("-" * 30)
+    print(f"🌍 SUSTAINABILITY INDEX (SSES): {sses_score:.1f}/100")
+    print("-" * 30)
+    print(f"💰 Net Economic Gain: ₹{net_benefit:,.2f}")
+    print(f"⚡ Energy Recovered:  {energy_gain:.2f} kWh")
+    print("="*50 + "\n")
     
     return final_metrics
 

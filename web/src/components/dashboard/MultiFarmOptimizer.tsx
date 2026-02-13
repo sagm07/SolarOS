@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { GlassDropdown } from "../ui/GlassDropdown";
 import { Factory, Droplets, Zap, Leaf, TrendingUp, Wifi, WifiOff } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -15,7 +16,7 @@ interface Farm {
 }
 
 export function MultiFarmOptimizer() {
-    const [waterBudget, setWaterBudget] = useState(2000);
+    const [waterBudget, setWaterBudget] = useState(50000);  // 50,000L for multi-MW solar park
     const [mode, setMode] = useState("PROFIT");
     const [result, setResult] = useState<any>(null);
     const [loading, setLoading] = useState(false);
@@ -26,37 +27,37 @@ export function MultiFarmOptimizer() {
             name: "Farm Alpha",
             latitude: 13.0827,
             longitude: 80.2707,
-            panel_area: 5000,
+            panel_area: 125000,  // 25 MW farm
             dust_rate: 1.2,
             electricity_price: 6.5,
-            water_usage: 1000,
+            water_usage: 10000,  // 10,000L for large farm
         },
         {
             name: "Farm Beta",
             latitude: 13.0827,
             longitude: 80.2707,
-            panel_area: 2000,
+            panel_area: 75000,  // 15 MW farm
             dust_rate: 1.0,
             electricity_price: 6.0,
-            water_usage: 400,
+            water_usage: 7500,
         },
         {
             name: "Farm Gamma",
             latitude: 13.0827,
             longitude: 80.2707,
-            panel_area: 3000,
+            panel_area: 50000,  // 10 MW farm
             dust_rate: 1.5,
             electricity_price: 6.2,
-            water_usage: 600,
+            water_usage: 5000,
         },
         {
             name: "Farm Delta",
             latitude: 13.0827,
             longitude: 80.2707,
-            panel_area: 1500,
-            dust_rate: 0.8,
-            electricity_price: 5.8,
-            water_usage: 300,
+            panel_area: 25000,  // 5 MW farm
+            dust_rate: 0.9,
+            electricity_price: 6.0,
+            water_usage: 2500,
         },
     ];
 
@@ -134,13 +135,13 @@ export function MultiFarmOptimizer() {
             <div className="space-y-4">
                 <div>
                     <label className="text-sm text-gray-400 mb-2 block">
-                        Water Budget (Liters): {waterBudget}L
+                        Water Budget (Liters): {waterBudget.toLocaleString()}L
                     </label>
                     <input
                         type="range"
-                        min="500"
-                        max="3000"
-                        step="100"
+                        min="10000"
+                        max="100000"
+                        step="5000"
                         value={waterBudget}
                         onChange={(e) => setWaterBudget(parseInt(e.target.value))}
                         className="w-full accent-emerald-500"
@@ -148,16 +149,16 @@ export function MultiFarmOptimizer() {
                 </div>
 
                 <div>
-                    <label className="text-sm text-gray-400 mb-2 block">Optimization Mode</label>
-                    <select
+                    <GlassDropdown
+                        label="Optimization Mode"
                         value={mode}
-                        onChange={(e) => setMode(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
-                    >
-                        <option value="PROFIT">Maximize Profit</option>
-                        <option value="CARBON">Maximize Carbon Offset</option>
-                        <option value="WATER_SCARCITY">Water Scarcity Mode</option>
-                    </select>
+                        onChange={(val) => setMode(val)}
+                        options={[
+                            { label: "Maximize Profit", value: "PROFIT" },
+                            { label: "Maximize Carbon Offset", value: "CARBON" },
+                            { label: "Water Scarcity Mode", value: "WATER_SCARCITY" },
+                        ]}
+                    />
                 </div>
 
                 <button

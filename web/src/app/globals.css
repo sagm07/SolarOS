@@ -47,3 +47,20 @@
 ::-webkit-scrollbar-thumb {
   @apply bg-gray-700 rounded-full hover:bg-gray-600;
 }
+
+/* Force Dark Theme for ALL Dropdowns */
+select {
+  background-color: #111827 !important;
+  color: white !important;
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #111827 !important;
+  color: white !important;
+}
+
+select optgroup {
+  background-color: #111827 !important;
+  color: white !important;
+}

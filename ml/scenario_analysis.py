@@ -159,12 +159,13 @@ def compare_30day_scenarios(
     days: int = 30,
     latitude: float = 13.0827,
     longitude: float = 80.2707,
-    panel_area: float = 100.0,
+    panel_area: float = None,  # Auto-calculated from plant_capacity_mw if not provided
+    plant_capacity_mw: float = 25.0,  # NEW: Plant capacity in MW (default 25 MW)
     electricity_price_inr: float = DEFAULT_ELECTRICITY_PRICE_INR,
     carbon_factor: float = DEFAULT_CARBON_FACTOR,
     cleaning_cost_inr: Optional[float] = None,
     cleaning_date_override: Optional[str] = None,
-    carbon_weight: float = 1.0,  # NEW: carbon importance (0-1)
+    carbon_weight: float = 1.0,  # Carbon importance (0-1)
 ) -> dict:
     """
     Compare two 30-day scenarios: no cleaning vs cleaning at recommended date.
@@ -178,7 +179,15 @@ def compare_30day_scenarios(
     if cleaning_cost_inr is None:
         cleaning_cost_inr = DEFAULT_CLEANING_COST_INR
     
-    print(f"\n[ANALYSIS START] lat={latitude:.4f}, lng={longitude:.4f}, carbon_weight={carbon_weight:.2f}, cleaning_cost=₹{cleaning_cost_inr:.2f}")
+    # NEW: Calculate panel_area from MW capacity if not explicitly provided
+    # 1 MW ≈ 5000 m² of solar panels
+    MW_TO_M2 = 5000.0
+    if panel_area is None:
+        panel_area = plant_capacity_mw * MW_TO_M2
+    
+    print(f"\n[ANALYSIS START] Plant: {plant_capacity_mw:.1f} MW ({panel_area:,.0f} m²)")
+    print(f"Location: lat={latitude:.4f}, lng={longitude:.4f}")
+    print(f"Carbon weight={carbon_weight:.2f}, Cleaning cost=₹{cleaning_cost_inr:.2f}\n")
 
     df = fetch_nasa_power_data(latitude=latitude, longitude=longitude, days=days)
     if df.empty:

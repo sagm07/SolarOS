@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CloudRain, Droplets, Leaf, TrendingDown } from "lucide-react";
 import { motion } from "framer-motion";
+import { GlassDropdown } from "../ui/GlassDropdown";
 
 export function RainIntelligence() {
     const [location, setLocation] = useState("Chennai, Tamil Nadu");
@@ -52,26 +53,23 @@ export function RainIntelligence() {
             {/* Controls */}
             <div className="space-y-4">
                 <div>
-                    <label className="text-sm text-gray-400 mb-2 block">Location</label>
-                    <select
+                    <GlassDropdown
+                        label="Location"
                         value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        className="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-cyan-500/50 transition-colors [&>option]:bg-black [&>option]:text-white [&>option]:py-2"
-                        style={{
-                            colorScheme: 'dark',
-                        }}
-                    >
-                        <option value="Chennai, Tamil Nadu" className="bg-black text-white py-2">Chennai, Tamil Nadu</option>
-                        <option value="Rajasthan (Jaipur)" className="bg-black text-white py-2">Rajasthan (Jaipur)</option>
-                        <option value="Gujarat (Ahmedabad)" className="bg-black text-white py-2">Gujarat (Ahmedabad)</option>
-                        <option value="Maharashtra (Mumbai)" className="bg-black text-white py-2">Maharashtra (Mumbai)</option>
-                        <option value="Karnataka (Bangalore)" className="bg-black text-white py-2">Karnataka (Bangalore)</option>
-                        <option value="Delhi NCR" className="bg-black text-white py-2">Delhi NCR</option>
-                        <option value="Punjab (Ludhiana)" className="bg-black text-white py-2">Punjab (Ludhiana)</option>
-                        <option value="Telangana (Hyderabad)" className="bg-black text-white py-2">Telangana (Hyderabad)</option>
-                        <option value="Andhra Pradesh (Visakhapatnam)" className="bg-black text-white py-2">Andhra Pradesh (Visakhapatnam)</option>
-                        <option value="California, USA" className="bg-black text-white py-2">California, USA</option>
-                    </select>
+                        onChange={(val) => setLocation(val)}
+                        options={[
+                            { label: "Chennai, Tamil Nadu", value: "Chennai, Tamil Nadu" },
+                            { label: "Rajasthan (Jaipur)", value: "Rajasthan (Jaipur)" },
+                            { label: "Gujarat (Ahmedabad)", value: "Gujarat (Ahmedabad)" },
+                            { label: "Maharashtra (Mumbai)", value: "Maharashtra (Mumbai)" },
+                            { label: "Karnataka (Bangalore)", value: "Karnataka (Bangalore)" },
+                            { label: "Delhi NCR", value: "Delhi NCR" },
+                            { label: "Punjab (Ludhiana)", value: "Punjab (Ludhiana)" },
+                            { label: "Telangana (Hyderabad)", value: "Telangana (Hyderabad)" },
+                            { label: "Andhra Pradesh (Visakhapatnam)", value: "Andhra Pradesh (Visakhapatnam)" },
+                            { label: "California, USA", value: "California, USA" },
+                        ]}
+                    />
                 </div>
 
                 <button

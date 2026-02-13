@@ -1,10 +1,12 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, AlertCircle, Loader2, Play } from "lucide-react";
+import { CheckCircle2, AlertCircle, Loader2, Play, Brain, TrendingUp, Leaf, Info, Droplets, Banknote, Sun } from "lucide-react";
 import { useState } from "react";
 import { clsx } from "clsx";
+import { GlassDropdown } from "../ui/GlassDropdown";
 
+// Updated Interface to match new API response
 interface AnalysisData {
     recommendation: "CLEAN" | "WAIT";
     cleaning_date: string | null;
@@ -14,39 +16,67 @@ interface AnalysisData {
     carbon_saved_kg: number;
     net_economic_gain_inr: number;
     water_used_liters: number;
+    sses_score: number; // New SSES Score
+    explanation?: {
+        model: string;
+        reason?: string;
+        reasons?: string[]; // New: Bullet points for decision logic
+        optimization_score: number;
+    };
 }
 
 export function LivePreview() {
     const [data, setData] = useState<AnalysisData | null>(null);
     const [loading, setLoading] = useState(false);
-    const [analyzingText, setAnalyzingText] = useState("Analyzing Chennai solar irradiance data...");
+    const [analyzingText, setAnalyzingText] = useState("Initializing Decision Engine...");
     const [hasRunAnalysis, setHasRunAnalysis] = useState(false);
     const [inputs, setInputs] = useState({
-        location: "Chennai, India",
+        location: "Chennai, Tamil Nadu",
         carbonPriority: 50,
-        cleaningCost: 1500
+        cleaningCost: 1500,
+        plantCapacityMW: 25
     });
 
-    // Location mapping
     const locationMap: Record<string, { lat: number; lng: number }> = {
-        "Chennai, India": { lat: 13.0827, lng: 80.2707 },
-        "Rajasthan, India": { lat: 26.9124, lng: 75.7873 },
+        "Chennai, Tamil Nadu": { lat: 13.0827, lng: 80.2707 },
+        "Jaisalmer, Rajasthan": { lat: 26.9124, lng: 70.9179 },
+        "Jodhpur, Rajasthan": { lat: 26.2389, lng: 73.0243 },
+        "Bikaner, Rajasthan": { lat: 28.0229, lng: 73.3119 },
+        "Gandhinagar, Gujarat": { lat: 23.2156, lng: 72.6369 },
+        "Anantapur, Andhra Pradesh": { lat: 14.6819, lng: 77.6006 },
+        "Kurnool, Andhra Pradesh": { lat: 15.8281, lng: 78.0373 },
+        "Bengaluru, Karnataka": { lat: 12.9716, lng: 77.5946 },
+        "Mumbai, Maharashtra": { lat: 19.0760, lng: 72.8777 },
+        "Hyderabad, Telangana": { lat: 17.3850, lng: 78.4867 },
+        "Pune, Maharashtra": { lat: 18.5204, lng: 73.8567 },
+        "New Delhi, NCR": { lat: 28.6139, lng: 77.2090 },
+        "Gurgaon, Haryana": { lat: 28.4595, lng: 77.0266 },
+        "Dubai, UAE": { lat: 25.2048, lng: 55.2708 },
+        "Riyadh, Saudi Arabia": { lat: 24.7136, lng: 46.6753 },
+        "Cairo, Egypt": { lat: 30.0444, lng: 31.2357 },
+        "Cape Town, South Africa": { lat: -33.9249, lng: 18.4241 },
         "California, USA": { lat: 36.7783, lng: -119.4179 },
+        "Arizona, USA": { lat: 34.0489, lng: -111.0937 },
+        "Santiago, Chile": { lat: -33.4489, lng: -70.6693 },
+        "Queensland, Australia": { lat: -20.9176, lng: 142.7028 },
+        "Beijing, China": { lat: 39.9042, lng: 116.4074 },
+        "Seville, Spain": { lat: 37.3891, lng: -5.9845 },
+        "Athens, Greece": { lat: 37.9838, lng: 23.7275 },
     };
 
-    // Fetch real data function with parameters
     const fetchAnalysis = async () => {
         setLoading(true);
         setData(null);
         try {
-            const coords = locationMap[inputs.location];
-            const carbonWeight = inputs.carbonPriority / 100; // Convert percentage to 0-1 range
+            const coords = locationMap[inputs.location] || locationMap["Chennai, Tamil Nadu"];
+            const carbonWeight = inputs.carbonPriority / 100;
 
             const queryParams = new URLSearchParams({
                 latitude: coords.lat.toString(),
                 longitude: coords.lng.toString(),
                 carbon_weight: carbonWeight.toString(),
                 cleaning_cost: inputs.cleaningCost.toString(),
+                plant_capacity_mw: inputs.plantCapacityMW.toString()
             });
 
             const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
@@ -56,7 +86,7 @@ export function LivePreview() {
 
             setData(json);
         } catch (e) {
-            // Fallback for demo/offline
+            // Updated Fallback with SSES
             setData({
                 recommendation: "CLEAN",
                 cleaning_date: "2024-12-15",
@@ -66,6 +96,12 @@ export function LivePreview() {
                 carbon_saved_kg: 87.5,
                 net_economic_gain_inr: 2450.0,
                 water_used_liters: 500.0,
+                sses_score: 85.4,
+                explanation: {
+                    model: "Dynamic Programming (Offline)",
+                    reason: "Simulated fallback data due to connection error.",
+                    optimization_score: 100.0
+                }
             });
         } finally {
             setLoading(false);
@@ -74,19 +110,54 @@ export function LivePreview() {
 
     const handleRunAnalysis = () => {
         setHasRunAnalysis(true);
-
-        // Sequence of text updates
-        setTimeout(() => setAnalyzingText("Fetching NASA satellite data..."), 800);
-        setTimeout(() => setAnalyzingText("Modeling dust degradation physics..."), 1600);
-        setTimeout(() => setAnalyzingText("Optimizing carbon vs. water trade-offs..."), 2400);
+        // More "Intelligent" status messages
+        setTimeout(() => setAnalyzingText("Fetching NASA Satellite Data..."), 500);
+        setTimeout(() => setAnalyzingText("Running Dynamic Programming Optimization..."), 1500);
+        setTimeout(() => setAnalyzingText("Calculating Sustainability Index (SSES)..."), 2500);
 
         setTimeout(() => {
             setLoading(false);
             fetchAnalysis();
-        }, 3000);
+        }, 3200);
     };
 
     const isWait = data?.recommendation === "WAIT";
+
+    // Options Arrays (Keep same as before)
+    const locationOptions = [
+        { group: "India 🇮🇳", label: "Chennai, Tamil Nadu", value: "Chennai, Tamil Nadu" },
+        { group: "India 🇮🇳", label: "Jaisalmer, Rajasthan", value: "Jaisalmer, Rajasthan" },
+        { group: "India 🇮🇳", label: "Jodhpur, Rajasthan", value: "Jodhpur, Rajasthan" },
+        { group: "India 🇮🇳", label: "Bikaner, Rajasthan", value: "Bikaner, Rajasthan" },
+        { group: "India 🇮🇳", label: "Gandhinagar, Gujarat", value: "Gandhinagar, Gujarat" },
+        { group: "India 🇮🇳", label: "Anantapur, Andhra Pradesh", value: "Anantapur, Andhra Pradesh" },
+        { group: "India 🇮🇳", label: "Kurnool, Andhra Pradesh", value: "Kurnool, Andhra Pradesh" },
+        { group: "India 🇮🇳", label: "Bengaluru, Karnataka", value: "Bengaluru, Karnataka" },
+        { group: "India 🇮🇳", label: "Mumbai, Maharashtra", value: "Mumbai, Maharashtra" },
+        { group: "India 🇮🇳", label: "Hyderabad, Telangana", value: "Hyderabad, Telangana" },
+        { group: "India 🇮🇳", label: "Pune, Maharashtra", value: "Pune, Maharashtra" },
+        { group: "India 🇮🇳", label: "New Delhi, NCR", value: "New Delhi, NCR" },
+        { group: "India 🇮🇳", label: "Gurgaon, Haryana", value: "Gurgaon, Haryana" },
+        { group: "Middle East", label: "Dubai, UAE", value: "Dubai, UAE" },
+        { group: "Middle East", label: "Riyadh, Saudi Arabia", value: "Riyadh, Saudi Arabia" },
+        { group: "Africa", label: "Cairo, Egypt", value: "Cairo, Egypt" },
+        { group: "Africa", label: "Cape Town, South Africa", value: "Cape Town, South Africa" },
+        { group: "Americas", label: "California, USA", value: "California, USA" },
+        { group: "Americas", label: "Arizona, USA", value: "Arizona, USA" },
+        { group: "Americas", label: "Santiago, Chile", value: "Santiago, Chile" },
+        { group: "Asia-Pacific", label: "Queensland, Australia", value: "Queensland, Australia" },
+        { group: "Asia-Pacific", label: "Beijing, China", value: "Beijing, China" },
+        { group: "Europe", label: "Seville, Spain", value: "Seville, Spain" },
+        { group: "Europe", label: "Athens, Greece", value: "Athens, Greece" },
+    ];
+
+    const farmSizeOptions = [
+        { label: "5 MW (Small - 25,000 m²)", value: 5 },
+        { label: "25 MW (Medium - 125,000 m²)", value: 25 },
+        { label: "50 MW (Large - 250,000 m²)", value: 50 },
+        { label: "100 MW (Utility Scale - 500,000 m²)", value: 100 },
+    ];
+
 
     return (
         <section id="live-analysis" className="py-24 bg-zinc-900/50 border-t border-white/5 relative overflow-hidden">
@@ -112,19 +183,23 @@ export function LivePreview() {
 
                     {/* Controls Card */}
                     <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 mb-8 space-y-6">
-                        <div>
-                            <label className="text-white text-sm font-medium mb-1 block">Location</label>
-                            <select
-                                className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-gray-300 outline-none focus:border-emerald-500/50 transition-colors"
-                                value={inputs.location}
-                                onChange={(e) => setInputs({ ...inputs, location: e.target.value })}
-                            >
-                                <option>Chennai, India</option>
-                                <option>Rajasthan, India</option>
-                                <option>California, USA</option>
-                            </select>
-                        </div>
+                        <GlassDropdown
+                            label="Location"
+                            value={inputs.location}
+                            onChange={(val) => setInputs({ ...inputs, location: val })}
+                            options={locationOptions}
+                            className="z-50"
+                        />
 
+                        <GlassDropdown
+                            label="Farm Size"
+                            value={inputs.plantCapacityMW}
+                            onChange={(val) => setInputs({ ...inputs, plantCapacityMW: val })}
+                            options={farmSizeOptions}
+                            className="z-40"
+                        />
+
+                        {/* Carbon Priority Slider */}
                         <div>
                             <div className="flex justify-between text-sm mb-2">
                                 <label className="text-white font-medium">Carbon Priority</label>
@@ -143,7 +218,7 @@ export function LivePreview() {
                                 <label className="text-white text-sm font-medium mb-1 block">Cleaning Cost (₹)</label>
                                 <input
                                     type="number"
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-gray-300 outline-none focus:border-emerald-500/50"
+                                    className="w-full bg-gray-900 border border-white/10 rounded-lg p-3 text-gray-300 outline-none focus:border-emerald-500/50"
                                     value={inputs.cleaningCost}
                                     onChange={(e) => setInputs({ ...inputs, cleaningCost: parseInt(e.target.value) })}
                                 />
@@ -164,134 +239,161 @@ export function LivePreview() {
                 <div className="relative min-h-[400px]">
 
                     <AnimatePresence mode="wait">
-                        {/* LOADING STATE */}
+                        {/* LOADING STATE - Enhanced */}
                         {loading && (
                             <motion.div
                                 key="loading"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md rounded-3xl border border-white/10"
+                                className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 bg-black/40 backdrop-blur-md rounded-2xl border border-white/10"
                             >
-                                <Loader2 className="w-12 h-12 text-emerald-400 animate-spin mb-4" />
-                                <p className="text-emerald-300 font-mono text-sm animate-pulse">{analyzingText}</p>
-                            </motion.div>
-                        )}
-
-                        {/* PLACEHOLDER - Before Analysis */}
-                        {!loading && !hasRunAnalysis && (
-                            <motion.div
-                                key="placeholder"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0 }}
-                                className="flex flex-col items-center justify-center bg-white/5 backdrop-blur-lg rounded-3xl border border-white/10 p-16 min-h-[400px]"
-                            >
-                                <div className="text-center">
-                                    <div className="w-20 h-20 rounded-full bg-emerald-900/20 flex items-center justify-center mx-auto mb-6 border border-emerald-500/20">
-                                        <Play className="w-10 h-10 text-emerald-400" />
+                                <div className="relative w-20 h-20 mb-6">
+                                    <div className="absolute inset-0 border-4 border-white/10 rounded-full"></div>
+                                    <div className="absolute inset-0 border-4 border-emerald-500 rounded-full border-t-transparent animate-spin"></div>
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <Brain className="w-8 h-8 text-emerald-400 animate-pulse" />
                                     </div>
-                                    <h3 className="font-serif text-2xl text-white mb-3">Ready to Analyze</h3>
-                                    <p className="text-gray-400 max-w-sm mx-auto">
-                                        Configure your parameters and click &quot;Run Analysis&quot; to see SolarOS intelligence in action.
-                                    </p>
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-2">Optimization Engine Running</h3>
+                                <p className="text-emerald-400 font-mono text-sm">{analyzingText}</p>
+
+                                {/* Real-time data stream effect */}
+                                <div className="mt-8 text-xs font-mono text-gray-500 text-left space-y-2 w-full max-w-[240px] opacity-75 border-l-2 border-emerald-500/30 pl-3">
+                                    <div className="flex justify-between"><span>MODEL</span> <span className="text-emerald-500">DYNAMIC_PROGRAMMING</span></div>
+                                    <div className="flex justify-between"><span>HORIZON</span> <span>30 DAYS</span></div>
+                                    <div className="flex justify-between"><span>IRRADIANCE</span> <span>{Math.floor(Math.random() * 200) + 800} W/m²</span></div>
+                                    <div className="flex justify-between"><span>DUST_RATE</span> <span>0.0{Math.floor(Math.random() * 5) + 2} g/m²/d</span></div>
                                 </div>
                             </motion.div>
                         )}
 
-                        {/* RESULT CARD - After Analysis */}
-                        {!loading && hasRunAnalysis && data && (
+                        {/* RESULTS STATE - Redesigned for Intelligence */}
+                        {!loading && data && (
                             <motion.div
                                 key="results"
-                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.5 }}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ type: "spring", stiffness: 100 }}
                                 className={clsx(
-                                    "p-8 rounded-3xl border bg-white/5 backdrop-blur-lg shadow-2xl relative overflow-hidden transition-all duration-500",
-                                    isWait ? "border-blue-500/30 shadow-[0_0_50px_rgba(59,130,246,0.1)]" : "border-emerald-500/50 shadow-[0_0_50px_rgba(16,185,129,0.15)]"
+                                    "rounded-3xl p-8 border backdrop-blur-xl relative overflow-hidden group hover:shadow-[0_0_50px_rgba(16,185,129,0.1)] transition-all duration-500",
+                                    isWait
+                                        ? "bg-gradient-to-br from-cyan-900/40 to-black/60 border-cyan-500/30"
+                                        : "bg-gradient-to-br from-emerald-900/40 to-black/60 border-emerald-500/30"
                                 )}
                             >
-                                {/* Background Decoration */}
+                                {/* Glowing orb background */}
                                 <div className={clsx(
-                                    "absolute top-0 right-0 w-64 h-64 rounded-full blur-[80px] pointer-events-none opacity-20",
-                                    isWait ? "bg-blue-500" : "bg-emerald-500"
+                                    "absolute -top-20 -right-20 w-64 h-64 rounded-full blur-[100px] opacity-20 transition-colors duration-1000",
+                                    isWait ? "bg-cyan-500" : "bg-emerald-500"
                                 )} />
 
-                                <div className="flex justify-between items-center mb-8 border-b border-white/10 pb-6 relative z-10">
-                                    <div>
-                                        <div className="text-sm text-gray-400 mb-1 font-medium tracking-wide">RECOMMENDATION</div>
-                                        <div className={clsx(
-                                            "text-3xl font-bold flex items-center gap-3",
-                                            isWait ? "text-blue-400" : "text-emerald-400"
-                                        )}>
-                                            <AlertCircle className={isWait ? "stroke-blue-400" : "stroke-emerald-400"} />
-                                            {data.recommendation}
+                                <div className="relative z-10">
+                                    {/* Header - Recommendation */}
+                                    <div className="flex items-start justify-between mb-8">
+                                        <div>
+                                            <div className="text-gray-400 text-sm font-medium tracking-wide mb-1">OPTIMAL DECISION</div>
+                                            <div className={clsx(
+                                                "text-4xl font-bold tracking-tight flex items-center gap-3",
+                                                isWait ? "text-cyan-400" : "text-emerald-400"
+                                            )}>
+                                                {isWait ? "DEFER CLEANING" : "CLEAN NOW"}
+                                                {isWait ? <AlertCircle className="w-8 h-8" /> : <CheckCircle2 className="w-8 h-8" />}
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-gray-500 mt-1 pl-1">
-                                            {isWait ? "Rain forecasted in 48h" : "Peak efficiency window detected"}
+                                        {/* SSES Badge (New) */}
+                                        <div className="text-right">
+                                            <div className="text-xs text-gray-400 mb-1 flex items-center justify-end gap-1">
+                                                SSES SCORE <Info className="w-3 h-3 cursor-help" />
+                                            </div>
+                                            <div className="text-3xl font-mono text-white flex items-end justify-end gap-2">
+                                                {data.sses_score.toFixed(1)}
+                                                <span className="text-sm text-gray-500 mb-1">/100</span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="text-xs text-gray-500">Confidence</div>
-                                        <div className="text-white font-bold font-mono text-lg">98.4%</div>
-                                    </div>
-                                </div>
 
-                                <div className="space-y-6 relative z-10">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-gray-400">Energy Recovery</span>
-                                        <span className="text-xl font-mono text-white tracking-tight">{data.additional_energy_kwh.toLocaleString('en-US')} kWh</span>
-                                    </div>
-                                    <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-                                        <motion.div
-                                            initial={{ width: 0 }}
-                                            animate={{ width: "75%" }}
-                                            className="bg-blue-500 h-full shadow-[0_0_10px_rgba(59,130,246,0.5)]"
-                                        />
-                                    </div>
+                                    {/* Decision Logic (Deep Explainability) - NEW */}
+                                    <div className="mb-6 bg-black/30 rounded-xl p-4 border border-white/10">
+                                        <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase mb-3">
+                                            <Brain className="w-4 h-4" />
+                                            Decision Intelligence
+                                        </div>
 
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-gray-400">Carbon Offset</span>
-                                        <span className="text-xl font-mono text-white tracking-tight">{data.carbon_saved_kg.toLocaleString('en-US')} kg</span>
-                                    </div>
-                                    <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-                                        <motion.div
-                                            initial={{ width: 0 }}
-                                            animate={{ width: "65%" }}
-                                            className="bg-emerald-500 h-full shadow-[0_0_10px_rgba(16,185,129,0.5)]"
-                                        />
+                                        {data.explanation?.reasons && data.explanation.reasons.length > 0 ? (
+                                            <ul className="space-y-2">
+                                                {data.explanation.reasons.map((r, i) => (
+                                                    <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
+                                                        <span className="mt-1.5 w-1 h-1 rounded-full bg-emerald-500/50 shrink-0" />
+                                                        {r}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <p className="text-gray-300 text-sm leading-relaxed">
+                                                {data.explanation?.reason || "Optimization model determined this is the most cost-effective action."}
+                                            </p>
+                                        )}
                                     </div>
 
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-gray-400">Water Usage</span>
-                                        <span className="text-xl font-mono text-white tracking-tight">{data.water_used_liters.toLocaleString('en-US')} L</span>
+                                    {/* Primary Metric - Economic Gain */}
+                                    <div className="mb-8 p-6 rounded-2xl bg-black/20 border border-white/5">
+                                        <div className="flex justify-between items-end mb-2">
+                                            <div className="text-gray-400 text-sm">Net Economic Gain (Projected)</div>
+                                            <div className="text-emerald-400 font-bold text-2xl">
+                                                ₹{data.net_economic_gain_inr.toLocaleString()}
+                                            </div>
+                                        </div>
+                                        <div className="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
+                                            <div
+                                                className="bg-emerald-500 h-full rounded-full"
+                                                style={{ width: `${Math.min(data.recoverable_capture_percent, 100)}%` }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between mt-2 text-xs text-gray-500 font-mono">
+                                            <span>Efficiency Recovery</span>
+                                            <span>{data.total_output_gain_percent.toFixed(1)}%</span>
+                                        </div>
                                     </div>
-                                    <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-                                        <motion.div
-                                            initial={{ width: 0 }}
-                                            animate={{ width: "20%" }}
-                                            className="bg-cyan-500 h-full shadow-[0_0_10px_rgba(6,182,212,0.5)]"
-                                        />
-                                    </div>
-                                </div>
 
-                                <div className="mt-8 pt-6 border-t border-white/10 flex justify-between items-end relative z-10">
-                                    <span className="text-sm text-gray-500">Net Sustainability Score</span>
-                                    <motion.span
-                                        key={data.net_economic_gain_inr}
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="text-3xl font-bold text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]"
-                                    >
-                                        +₹{data.net_economic_gain_inr.toLocaleString('en-US')}
-                                    </motion.span>
+                                    {/* Secondary Metrics Grid */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                                            <div className="text-gray-400 text-xs uppercase mb-1 flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Energy Gain</div>
+                                            <div className="text-white font-bold text-lg">+{data.additional_energy_kwh.toFixed(0)} kWh</div>
+                                        </div>
+                                        <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                                            <div className="text-gray-400 text-xs uppercase mb-1 flex items-center gap-1"><Droplets className="w-3 h-3" /> Water Used</div>
+                                            <div className="text-white font-bold text-lg">{data.water_used_liters.toFixed(0)} L</div>
+                                        </div>
+                                        <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                                            <div className="text-gray-400 text-xs uppercase mb-1 flex items-center gap-1"><Leaf className="w-3 h-3" /> Carbon Saved</div>
+                                            <div className="text-white font-bold text-lg">{data.carbon_saved_kg.toFixed(1)} kg</div>
+                                        </div>
+                                        <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                                            <div className="text-gray-400 text-xs uppercase mb-1 flex items-center gap-1"><Sun className="w-3 h-3" /> Cleaning Date</div>
+                                            <div className="text-emerald-400 font-bold text-lg">{data.cleaning_date || "Deferred"}</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </motion.div>
                         )}
-                    </AnimatePresence>
-                </div>
 
+                        {/* EMPTY STATE */}
+                        {!loading && !data && (
+                            <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-50">
+                                <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-6">
+                                    <Play className="w-10 h-10 text-white/20" />
+                                </div>
+                                <h3 className="text-xl text-white font-serif mb-2">Ready to Optimize?</h3>
+                                <p className="text-gray-500 max-w-sm">
+                                    Adjust the parameters on the left and click "Run Analysis" to see the engine in action.
+                                </p>
+                            </div>
+                        )}
+                    </AnimatePresence>
+
+                </div>
             </div>
         </section>
     );
