@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Factory, Droplets, Zap, Leaf, TrendingUp } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Factory, Droplets, Zap, Leaf, TrendingUp, Wifi, WifiOff } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface Farm {
@@ -19,6 +19,7 @@ export function MultiFarmOptimizer() {
     const [mode, setMode] = useState("PROFIT");
     const [result, setResult] = useState<any>(null);
     const [loading, setLoading] = useState(false);
+    const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
     const sampleFarms: Farm[] = [
         {
@@ -59,6 +60,21 @@ export function MultiFarmOptimizer() {
         },
     ];
 
+    // Health check on mount
+    useEffect(() => {
+        checkBackendHealth();
+    }, []);
+
+    const checkBackendHealth = async () => {
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+            const res = await fetch(`${apiUrl}/health`, { method: 'GET' });
+            setBackendStatus(res.ok ? 'online' : 'offline');
+        } catch {
+            setBackendStatus('offline');
+        }
+    };
+
     const optimizeFarms = async () => {
         setLoading(true);
         setResult(null);
@@ -74,10 +90,25 @@ export function MultiFarmOptimizer() {
                     mode: mode,
                 }),
             });
+
+            if (!res.ok) {
+                throw new Error(`Backend returned ${res.status}: ${res.statusText}`);
+            }
+
             const data = await res.json();
             setResult(data);
+            setBackendStatus('online'); // Update status on successful call
         } catch (error) {
-            setResult({ error: "Failed to optimize portfolio" });
+            console.error("Optimization error:", error);
+            const isFetchError = error instanceof TypeError && error.message.includes('fetch');
+            setResult({
+                error: isFetchError
+                    ? "Backend API is not running. Please start the backend server."
+                    : "Failed to optimize portfolio. Check console for details."
+            });
+            if (isFetchError) {
+                setBackendStatus('offline');
+            }
         } finally {
             setLoading(false);
         }
@@ -85,6 +116,20 @@ export function MultiFarmOptimizer() {
 
     return (
         <div className="space-y-6">
+            {/* Backend Status Indicator */}
+            {backendStatus === 'offline' && (
+                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                    <WifiOff className="w-4 h-4" />
+                    <span>Backend API is offline. Portfolio optimization unavailable.</span>
+                </div>
+            )}
+            {backendStatus === 'online' && (
+                <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 text-sm">
+                    <Wifi className="w-4 h-4" />
+                    <span>Backend API connected</span>
+                </div>
+            )}
+
             {/* Controls */}
             <div className="space-y-4">
                 <div>
