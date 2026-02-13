@@ -15,7 +15,7 @@ export function Hero() {
                 <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/40 to-black" />
             </div>
 
-            <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-20">
+            <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-36">
 
                 {/* Main Title */}
                 <motion.h1
