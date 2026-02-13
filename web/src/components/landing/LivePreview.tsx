@@ -387,7 +387,7 @@ export function LivePreview() {
                                 </div>
                                 <h3 className="text-xl text-white font-serif mb-2">Ready to Optimize?</h3>
                                 <p className="text-gray-500 max-w-sm">
-                                    Adjust the parameters on the left and click "Run Analysis" to see the engine in action.
+                                    Adjust the parameters on the left and click &quot;Run Analysis&quot; to see the engine in action.
                                 </p>
                             </div>
                         )}
