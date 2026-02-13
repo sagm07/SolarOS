@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Leaf, Moon, Sun, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { SolarLogo } from "../ui/SolarLogo";
 
 export function Navbar() {
     const { theme, setTheme } = useTheme();
@@ -46,12 +47,7 @@ export function Navbar() {
 
                     {/* Logo */}
                     <Link href="/" className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-full bg-lime-accent">
-                            <Leaf className="w-4 h-4 text-black" />
-                        </div>
-                        <span className="text-lg font-bold text-white">
-                            SolarOS
-                        </span>
+                        <SolarLogo size="md" variant="default" />
                     </Link>
 
                     {/* Desktop Links */}
