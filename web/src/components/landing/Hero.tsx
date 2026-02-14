@@ -62,6 +62,7 @@ export function Hero() {
                     </motion.button>
 
                     <motion.button
+                        onClick={() => window.open('https://youtu.be/rq4hGxwB5mk?si=eP30gk84a-CHhN0S', '_blank')}
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         className="flex items-center gap-3 px-8 py-5 border border-white/20 rounded-full text-white hover:bg-white/5 transition-colors backdrop-blur-sm"
