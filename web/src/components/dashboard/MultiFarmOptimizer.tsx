@@ -420,14 +420,18 @@ export function MultiFarmOptimizer() {
                 </motion.div>
             )}
 
-            {/* Loading Skeletons */}
+            {/* Loading Skeletons - Gradient Pulse */}
             {loading && (
-                <div className="space-y-4 animate-pulse">
-                    <div className="h-24 bg-white/5 rounded-xl w-full"></div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="h-24 bg-white/5 rounded-xl"></div>
-                        <div className="h-24 bg-white/5 rounded-xl"></div>
+                <div className="space-y-4 p-4 border border-white/5 rounded-2xl bg-white/5 backdrop-blur-sm">
+                    <div className="space-y-3">
+                        <div className="h-4 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 rounded animate-pulse" />
+                        <div className="h-4 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 rounded animate-pulse w-3/4" />
+                        <div className="h-4 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 rounded animate-pulse w-1/2" />
                     </div>
+                    <p className="text-sm text-emerald-400 animate-pulse flex items-center gap-2">
+                        <BrainCircuit className="w-4 h-4" />
+                        {loadingStep || "Initializing AI models..."}
+                    </p>
                 </div>
             )}
 
@@ -501,7 +505,7 @@ export function MultiFarmOptimizer() {
                                     </Tooltip>
                                 </div>
                                 <div className={`text-3xl font-bold ${theme.primary}`}>
-                                    ₹<CountUp end={result.total_benefit || 0} duration={2.5} separator="," />
+                                    <CountUp end={result.total_benefit || 0} duration={2.5} separator="," prefix="₹" />
                                 </div>
                             </motion.div>
 
