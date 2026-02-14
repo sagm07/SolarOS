@@ -46,7 +46,8 @@ def fetch_nasa_power_data(latitude=13.0827, longitude=80.2707, days=30):
     print(f"Fetching data for {days} days from {start_str} to {end_str}...")
     
     try:
-        response = requests.get(url)
+        # Added timeout for production stability
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         
         data = response.json()

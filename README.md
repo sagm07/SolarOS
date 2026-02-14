@@ -9,6 +9,20 @@
 
 ---
 
+## 🚀 Live Demo
+
+- **Frontend (Vercel):** [https://solaros.vercel.app](https://solaros.vercel.app)
+- **Backend (Render):** [https://solaros.onrender.com/docs](https://solaros.onrender.com/docs)
+
+---
+
+## 🚀 Live Demo
+
+- **Frontend (Vercel):** [https://solaros.vercel.app](https://solaros.vercel.app)
+- **Backend (Render):** [https://solaros.onrender.com/docs](https://solaros.onrender.com/docs)
+
+---
+
 ## 🌍 Overview
 
 SolarOS is a **full-stack SaaS application** that helps solar farm operators optimize cleaning schedules by balancing:
