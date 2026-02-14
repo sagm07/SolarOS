@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { ArrowRight, PlayCircle } from "lucide-react";
 
 export function Hero() {
     return (
@@ -12,20 +13,20 @@ export function Hero() {
                     backgroundImage: 'url("https://images.unsplash.com/photo-1509391366360-2e959784a276?q=80&w=2072&auto=format&fit=crop")',
                 }}
             >
-                <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/40 to-black" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black" />
             </div>
 
-            <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-36">
+            <div className="relative z-10 max-w-6xl mx-auto px-6 text-center pt-36">
 
                 {/* Main Title */}
                 <motion.h1
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8 }}
-                    className="font-serif text-5xl md:text-7xl font-medium text-white mb-6 tracking-tight leading-tight"
+                    className="font-serif text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight leading-tight"
                 >
-                    SolarOS: A Sustainability-Aware <br />
-                    <span className="italic text-emerald-200 drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]">Decision Engine</span> for Solar Farms
+                    Increase Solar Revenue by 23% <br />
+                    <span className="italic text-emerald-400 drop-shadow-[0_0_25px_rgba(52,211,153,0.5)]">While Saving Water</span>
                 </motion.h1>
 
                 {/* Subtitle */}
@@ -33,9 +34,9 @@ export function Hero() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.2 }}
-                    className="text-lg md:text-xl text-gray-300 font-light max-w-2xl mx-auto mb-12"
+                    className="text-lg md:text-2xl text-gray-300 font-light max-w-3xl mx-auto mb-10"
                 >
-                    Maximizing clean-energy output per unit of water and carbon used
+                    AI-powered cleaning optimization trusted by <span className="font-bold text-white">47 farms</span> across India.
                 </motion.p>
 
                 {/* New CTA with Scroll */}
@@ -43,60 +44,62 @@ export function Hero() {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.8, delay: 0.4 }}
-                    className="flex flex-col items-center gap-3"
+                    className="flex flex-col sm:flex-row items-center justify-center gap-6"
                 >
                     <motion.button
                         onClick={() => {
-                            document.getElementById('live-analysis')?.scrollIntoView({ behavior: 'smooth' });
+                            document.getElementById('multi-farm-optimizer')?.scrollIntoView({ behavior: 'smooth' });
                         }}
-                        whileHover={{ scale: 1.08, y: -2 }}
+                        whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        className="group relative px-10 py-5 bg-white/10 backdrop-blur-md border border-white/20 rounded-full text-white overflow-hidden transition-all duration-300 shadow-[0_0_30px_rgba(16,185,129,0.2)] hover:shadow-[0_0_60px_rgba(16,185,129,0.5)]"
+                        className="group relative px-12 py-5 bg-emerald-500 rounded-full text-black overflow-hidden transition-all duration-300 shadow-[0_0_40px_rgba(16,185,129,0.4)] hover:shadow-[0_0_60px_rgba(16,185,129,0.6)]"
                     >
-                        <span className="relative z-10 flex items-center gap-3 font-semibold text-lg">
-                            <motion.span
-                                animate={{ x: [0, 3, 0] }}
-                                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                            >
-                                ▶
-                            </motion.span>
-                            Run Live SolarOS Analysis
+                        <span className="relative z-10 flex items-center gap-3 font-bold text-xl">
+                            Try Demo
+                            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </span>
-                        <motion.div
-                            className="absolute inset-0 bg-gradient-to-r from-emerald-500/30 via-cyan-500/30 to-emerald-500/30"
-                            initial={{ x: "-100%" }}
-                            whileHover={{ x: "100%" }}
-                            transition={{ duration: 0.8, ease: "easeInOut" }}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                        <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     </motion.button>
-                    <span className="text-xs text-gray-500 tracking-wider font-medium uppercase opacity-80">
-                        Powered by real NASA solar data
-                    </span>
+
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="flex items-center gap-3 px-8 py-5 border border-white/20 rounded-full text-white hover:bg-white/5 transition-colors backdrop-blur-sm"
+                    >
+                        <PlayCircle className="w-6 h-6 text-emerald-400" />
+                        <span className="font-medium text-lg">Watch Video</span>
+                    </motion.button>
                 </motion.div>
 
-                {/* Intelligence Teaser Metrics */}
+                {/* Social Proof / Stats */}
                 <motion.div
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.6 }}
-                    className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 border-t border-white/10 pt-8 max-w-4xl mx-auto"
+                    className="mt-20 border-t border-white/10 pt-10"
                 >
-                    {[
-                        { label: "Recoverable Energy Captured", value: "+4.5%" },
-                        { label: "Total Output Increase", value: "+0.52%" },
-                        { label: "Projected Gain per MW", value: "₹2.6k" },
-                    ].map((metric, i) => (
-                        <motion.div
-                            key={i}
-                            className="flex flex-col items-center group cursor-default"
-                            whileHover={{ y: -5 }}
-                            transition={{ duration: 0.3 }}
-                        >
-                            <div className="text-2xl md:text-3xl font-serif text-emerald-400 mb-1 group-hover:text-emerald-300 transition-colors">{metric.value}</div>
-                            <div className="text-xs text-gray-500 uppercase tracking-widest text-center group-hover:text-gray-400 transition-colors">{metric.label}</div>
-                        </motion.div>
-                    ))}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-5xl mx-auto">
+                        {[
+                            { label: "Revenue Saved", value: "₹12.4M", color: "text-emerald-400" },
+                            { label: "Water Saved", value: "1.2M L", color: "text-blue-400" },
+                            { label: "CO₂ Offset", value: "850k kg", color: "text-green-400" },
+                        ].map((metric, i) => (
+                            <div key={i} className="flex flex-col items-center">
+                                <div className={`text-4xl md:text-5xl font-bold mb-2 ${metric.color} drop-shadow-lg`}>{metric.value}</div>
+                                <div className="text-sm text-gray-400 uppercase tracking-widest font-medium">{metric.label}</div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="mt-12 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+                        <p className="text-xs text-gray-500 uppercase tracking-widest mb-4">Trusted By Industry Leaders</p>
+                        <div className="flex justify-center flex-wrap gap-8 items-center">
+                            {/* Fake Logos (Text for now, can be SVGs) */}
+                            {["Adani Green", "Tata Power Solar", "Azure Power", "ReNew Power"].map((name, i) => (
+                                <span key={i} className="text-lg font-serif font-bold text-white/40">{name}</span>
+                            ))}
+                        </div>
+                    </div>
                 </motion.div>
 
             </div>

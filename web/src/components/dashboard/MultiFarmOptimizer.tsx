@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useRef } from "react";
 import { GlassDropdown } from "../ui/GlassDropdown";
-import { Factory, Droplets, Zap, Leaf, TrendingUp, Wifi, WifiOff, Loader2, CheckCircle2, ArrowRight, Download, BrainCircuit, Calendar } from "lucide-react";
+import { Factory, Droplets, Zap, Leaf, TrendingUp, Wifi, Loader2, CheckCircle2, ArrowRight, Download, BrainCircuit, Calendar, RefreshCw, HelpCircle, Info } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import CountUp from "react-countup";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
+// --- Types ---
 interface Farm {
     name: string;
     latitude: number;
@@ -29,6 +30,38 @@ interface FarmScore {
     roi: number;
 }
 
+// --- Components ---
+
+const Tooltip = ({ content, children }: { content: string, children: React.ReactNode }) => {
+    const [isVisible, setIsVisible] = useState(false);
+
+    return (
+        <div
+            className="relative flex items-center"
+            onMouseEnter={() => setIsVisible(true)}
+            onMouseLeave={() => setIsVisible(false)}
+        >
+            {children}
+            <AnimatePresence>
+                {isVisible && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 border border-white/10 rounded-lg text-xs text-white whitespace-nowrap z-50 shadow-xl"
+                    >
+                        {content}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900" />
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
+
+// --- Main Component ---
+
 export function MultiFarmOptimizer() {
     const [waterBudget, setWaterBudget] = useState(50000);
     const [mode, setMode] = useState("PROFIT");
@@ -36,60 +69,48 @@ export function MultiFarmOptimizer() {
     const [loading, setLoading] = useState(false);
     const [loadingStep, setLoadingStep] = useState<string>("");
     const [useClientSide, setUseClientSide] = useState(false);
-    const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline' | 'waking_up'>('checking');
+    const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
     // Detailed sample data for "AI Insights"
     const [aiInsights, setAiInsights] = useState<string[]>([]);
     const resultsRef = useRef<HTMLDivElement>(null);
 
     const sampleFarms: Farm[] = [
-        {
-            name: "Farm Alpha",
-            latitude: 13.0827,
-            longitude: 80.2707,
-            panel_area: 125000,
-            dust_rate: 1.2,
-            electricity_price: 6.5,
-            water_usage: 10000,
-        },
-        {
-            name: "Farm Beta",
-            latitude: 13.0827,
-            longitude: 80.2707,
-            panel_area: 75000,
-            dust_rate: 1.0,
-            electricity_price: 6.0,
-            water_usage: 7500,
-        },
-        {
-            name: "Farm Gamma",
-            latitude: 13.0827,
-            longitude: 80.2707,
-            panel_area: 50000,
-            dust_rate: 1.5,
-            electricity_price: 6.2,
-            water_usage: 5000,
-        },
-        {
-            name: "Farm Delta",
-            latitude: 13.0827,
-            longitude: 80.2707,
-            panel_area: 25000,
-            dust_rate: 0.9,
-            electricity_price: 6.0,
-            water_usage: 2500,
-        },
+        { name: "Farm Alpha", latitude: 13.0827, longitude: 80.2707, panel_area: 125000, dust_rate: 1.2, electricity_price: 6.5, water_usage: 10000 },
+        { name: "Farm Beta", latitude: 13.0827, longitude: 80.2707, panel_area: 75000, dust_rate: 1.0, electricity_price: 6.0, water_usage: 7500 },
+        { name: "Farm Gamma", latitude: 13.0827, longitude: 80.2707, panel_area: 50000, dust_rate: 1.5, electricity_price: 6.2, water_usage: 5000 },
+        { name: "Farm Delta", latitude: 13.0827, longitude: 80.2707, panel_area: 25000, dust_rate: 0.9, electricity_price: 6.0, water_usage: 2500 },
     ];
+
+    // --- Effects ---
 
     useEffect(() => {
         checkBackendHealth();
     }, []);
 
+    // Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.code === "Space" && !loading && !result) {
+                e.preventDefault(); // Prevent scrolling
+                optimizeFarms();
+            }
+            if (e.key.toLowerCase() === "r" && result) {
+                handleReset();
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [loading, result, mode, waterBudget]); // Dependencies for closure freshness
+
+    // --- Logic ---
+
     const checkBackendHealth = async () => {
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
 
             const res = await fetch(`${apiUrl}/health`, {
                 method: 'GET',
@@ -104,60 +125,66 @@ export function MultiFarmOptimizer() {
                 return;
             }
         } catch {
-            // Backend not available, use client-side
+            // Backend not available
         }
-
         setBackendStatus('offline');
         setUseClientSide(true);
     };
 
-    // Client-side optimization algorithm
-    const optimizeFarmsClientSide = (
-        farms: Farm[],
-        waterBudget: number,
-        mode: string
-    ) => {
+    const getThemeColors = () => {
+        switch (mode) {
+            case "CARBON":
+                return {
+                    primary: "text-blue-400",
+                    bg: "bg-blue-500/10",
+                    border: "border-blue-500/30",
+                    gradient: "from-blue-500 to-cyan-500",
+                    button: "bg-blue-500",
+                    shadow: "shadow-blue-500/20"
+                };
+            case "WATER_SCARCITY":
+                return {
+                    primary: "text-cyan-400",
+                    bg: "bg-cyan-500/10",
+                    border: "border-cyan-500/30",
+                    gradient: "from-cyan-500 to-teal-500",
+                    button: "bg-cyan-500",
+                    shadow: "shadow-cyan-500/20"
+                };
+            default: // PROFIT
+                return {
+                    primary: "text-emerald-400",
+                    bg: "bg-emerald-500/10",
+                    border: "border-emerald-500/30",
+                    gradient: "from-emerald-500 to-green-500",
+                    button: "bg-emerald-500",
+                    shadow: "shadow-emerald-500/20"
+                };
+        }
+    };
+
+    const theme = getThemeColors();
+
+    const optimizeFarmsClientSide = (farms: Farm[], waterBudget: number, mode: string) => {
         const farmScores: FarmScore[] = [];
 
         for (const farm of farms) {
-            // Energy recovery calculation (Simulated physics)
             const daysSinceClean = 30;
             const efficiencyLoss = farm.dust_rate * daysSinceClean * 0.002;
-
-            // Average solar irradiance in Chennai (kWh/m²/day)
             const avgIrradiance = 5.5;
             const panelEfficiency = 0.20;
 
-            // Energy recoverable by cleaning (kWh)
-            const energyRecoverable =
-                farm.panel_area *
-                avgIrradiance *
-                panelEfficiency *
-                efficiencyLoss *
-                30; // Days of benefit
-
-            // Financial benefit
+            const energyRecoverable = farm.panel_area * avgIrradiance * panelEfficiency * efficiencyLoss * 30;
             const revenue = energyRecoverable * farm.electricity_price;
-            const cleaningCost = farm.water_usage * 0.05; // ₹0.05 per liter
+            const cleaningCost = farm.water_usage * 0.05;
             const netBenefit = revenue - cleaningCost;
-
-            // Carbon offset (kg CO2 per kWh)
             const co2Offset = energyRecoverable * 0.82;
+            const waterEfficiency = farm.water_usage > 0 ? energyRecoverable / farm.water_usage : 0;
 
-            // Water efficiency (energy per liter)
-            const waterEfficiency = farm.water_usage > 0
-                ? energyRecoverable / farm.water_usage
-                : 0;
-
-            // Calculate priority score based on mode
             let priority: number;
-            if (mode === "PROFIT") {
-                priority = netBenefit;
-            } else if (mode === "CARBON") {
-                priority = co2Offset;
-            } else { // WATER_SCARCITY
-                priority = waterEfficiency;
-            }
+            if (mode === "PROFIT") priority = netBenefit;
+            else if (mode === "CARBON") priority = co2Offset;
+            else priority = waterEfficiency; // WATER_SCARCITY
 
             farmScores.push({
                 name: farm.name,
@@ -170,10 +197,8 @@ export function MultiFarmOptimizer() {
             });
         }
 
-        // Sort by priority (descending)
         farmScores.sort((a, b) => b.priority - a.priority);
 
-        // Greedy selection within water budget
         const selected: FarmScore[] = [];
         let totalWater = 0;
         let totalEnergy = 0;
@@ -204,31 +229,17 @@ export function MultiFarmOptimizer() {
         const duration = 3 * 1000;
         const animationEnd = Date.now() + duration;
         const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-
         const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
 
         const interval: any = setInterval(function () {
             const timeLeft = animationEnd - Date.now();
-
-            if (timeLeft <= 0) {
-                return clearInterval(interval);
-            }
+            if (timeLeft <= 0) return clearInterval(interval);
 
             const particleCount = 50 * (timeLeft / duration);
-            confetti({
-                ...defaults,
-                particleCount,
-                origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
-            });
-            confetti({
-                ...defaults,
-                particleCount,
-                origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
-            });
+            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
         }, 250);
     };
-
-    const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     const generateInsights = (data: any) => {
         const insights = [
@@ -237,22 +248,25 @@ export function MultiFarmOptimizer() {
             `Optimal cleaning window is between 06:00 AM - 09:00 AM to minimize evaporation.`,
             `Expected ROI for this cleaning cycle is ${(data.total_benefit / (data.water_used * 0.05) * 100).toFixed(0)}%.`
         ];
-        // Randomize slightly for variety
         return insights.sort(() => 0.5 - Math.random()).slice(0, 3);
     };
 
     const handleExportPDF = async () => {
         if (!resultsRef.current) return;
-
         const canvas = await html2canvas(resultsRef.current);
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jsPDF();
         const imgProps = pdf.getImageProperties(imgData);
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
         pdf.save('solaros-optimization-report.pdf');
+    };
+
+    const handleReset = () => {
+        setResult(null);
+        setAiInsights([]);
+        setLoading(false);
     };
 
     const optimizeFarms = async () => {
@@ -260,67 +274,37 @@ export function MultiFarmOptimizer() {
         setResult(null);
         setLoadingStep("Initializing physics engine...");
 
-        // Simulate analysis steps for better UX - "Fake It Till You Make It"
-        await wait(800);
+        await new Promise(r => setTimeout(r, 800));
         setLoadingStep("Querying NASA satellite data (30 days)...");
-        await wait(1000);
+        await new Promise(r => setTimeout(r, 1000));
         setLoadingStep(`Optimizing ${sampleFarms.length} farms for ${mode}...`);
-        await wait(800);
+        await new Promise(r => setTimeout(r, 800));
         setLoadingStep("Finalizing portfolio strategy...");
-        await wait(600);
+        await new Promise(r => setTimeout(r, 600));
 
         const handleSuccess = (data: any) => {
             setResult(data);
             setAiInsights(generateInsights(data));
-            if (data.selected_farms && data.selected_farms.length > 0) {
-                triggerConfetti();
-            }
+            if (data.selected_farms?.length > 0) triggerConfetti();
         };
 
-        // Use client-side optimization if backend is offline
-        if (useClientSide || backendStatus === 'offline') {
-            try {
+        try {
+            // Prefer client-side for hackathon reliability if offline
+            if (useClientSide || backendStatus === 'offline') {
                 const data = optimizeFarmsClientSide(sampleFarms, waterBudget, mode);
                 handleSuccess(data);
-            } catch (error) {
-                console.error("Client-side optimization error:", error);
-                setResult({
-                    error: "Optimization failed. Please try again."
+            } else {
+                const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+                const res = await fetch(`${apiUrl}/optimize-farms`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ farms: sampleFarms, water_budget: waterBudget, mode: mode }),
                 });
-            } finally {
-                setLoading(false);
-                setLoadingStep("");
+                if (!res.ok) throw new Error("Backend error");
+                const data = await res.json();
+                handleSuccess(data);
             }
-            return;
-        }
-
-        // Try backend API
-        try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-            const res = await fetch(`${apiUrl}/optimize-farms`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    farms: sampleFarms,
-                    water_budget: waterBudget,
-                    mode: mode,
-                }),
-            });
-
-            if (!res.ok) {
-                throw new Error(`Backend returned ${res.status}`);
-            }
-
-            const data = await res.json();
-            handleSuccess(data);
-            setBackendStatus('online');
         } catch (error) {
-            console.error("Backend optimization error:", error);
-
-            // Fallback to client-side
-            setUseClientSide(true);
-            setBackendStatus('offline');
-
             const data = optimizeFarmsClientSide(sampleFarms, waterBudget, mode);
             handleSuccess(data);
         } finally {
@@ -330,45 +314,26 @@ export function MultiFarmOptimizer() {
     };
 
     return (
-        <div className="space-y-6">
-            {/* Backend Status Indicator */}
+        <div id="multi-farm-optimizer" className="space-y-6">
+            {/* Backend Status (Hidden unless offline for cleaner demo) */}
             {backendStatus === 'offline' && (
-                <div className="flex items-center gap-2 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-400 text-sm">
-                    <Zap className="w-4 h-4" />
-                    <span>Running in client-side mode (backend offline)</span>
-                </div>
-            )}
-            {backendStatus === 'checking' && (
-                <div className="flex items-center gap-2 p-3 bg-gray-500/10 border border-gray-500/30 rounded-lg text-gray-400 text-sm animate-pulse">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Checking backend connection...</span>
-                </div>
-            )}
-            {backendStatus === 'online' && !useClientSide && (
-                <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 text-sm">
-                    <Wifi className="w-4 h-4" />
-                    <span>Backend API connected</span>
-                </div>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 p-2 px-3 bg-red-500/10 border border-red-500/20 rounded-full text-red-400 text-xs w-fit mx-auto">
+                    <Wifi className="w-3 h-3" />
+                    <span>Offline Mode (Demo Data)</span>
+                </motion.div>
             )}
 
             {/* Controls */}
-            <div className="space-y-4">
-                <div>
-                    <label className="text-sm text-gray-400 mb-2 block">
-                        Water Budget (Liters): {waterBudget.toLocaleString()}L
-                    </label>
-                    <input
-                        type="range"
-                        min="10000"
-                        max="100000"
-                        step="5000"
-                        value={waterBudget}
-                        onChange={(e) => setWaterBudget(parseInt(e.target.value))}
-                        className="w-full accent-emerald-500"
-                    />
-                </div>
+            <div className="space-y-6 bg-white/5 border border-white/10 p-6 rounded-2xl backdrop-blur-sm">
 
+                {/* Mode Selection with visual feedback */}
                 <div>
+                    <label className="text-sm text-gray-400 mb-2 block flex items-center justify-between">
+                        <span>Optimization Goal</span>
+                        <Tooltip content="Choose what metric SolarOS should prioritize">
+                            <HelpCircle className="w-4 h-4 text-gray-500 cursor-help hover:text-white transition-colors" />
+                        </Tooltip>
+                    </label>
                     <GlassDropdown
                         label="Optimization Mode"
                         value={mode}
@@ -381,221 +346,262 @@ export function MultiFarmOptimizer() {
                     />
                 </div>
 
+                {/* Water Budget Slider */}
+                <div>
+                    <div className="flex justify-between items-end mb-2">
+                        <label className="text-sm text-gray-400">Water Budget</label>
+                        <span className={`text-xl font-bold font-mono ${theme.primary}`}>{waterBudget.toLocaleString()}L</span>
+                    </div>
+                    <input
+                        type="range"
+                        min="10000"
+                        max="100000"
+                        step="5000"
+                        value={waterBudget}
+                        onChange={(e) => setWaterBudget(parseInt(e.target.value))}
+                        className={`w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-${mode === 'PROFIT' ? 'emerald' : mode === 'CARBON' ? 'blue' : 'cyan'}-500`}
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>Strict (10k L)</span>
+                        <span>Liberal (100k L)</span>
+                    </div>
+                </div>
+
+                {/* Main Action Button */}
                 <div className="relative group">
-                    <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-lg blur opacity-30 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
+                    <div className={`absolute -inset-0.5 bg-gradient-to-r ${theme.gradient} rounded-xl blur opacity-30 group-hover:opacity-100 transition duration-1000 group-hover:duration-200`}></div>
                     <button
                         onClick={optimizeFarms}
                         disabled={loading}
-                        className="relative w-full bg-black border border-white/10 text-emerald-400 font-bold px-6 py-3 rounded-lg hover:text-white transition-all duration-300 disabled:opacity-50 min-h-[50px]"
+                        className="relative w-full bg-black border border-white/10 text-white font-bold px-6 py-4 rounded-xl hover:bg-gray-900 transition-all duration-300 disabled:opacity-50 min-h-[60px] flex items-center justify-center gap-2"
                     >
                         {loading ? (
-                            <div className="flex flex-col items-center justify-center gap-1">
+                            <div className="flex flex-col items-center">
                                 <div className="flex items-center gap-2">
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    <span>Processing...</span>
+                                    <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
+                                    <span>Processing Portfolio...</span>
                                 </div>
-                                <span className="text-xs text-gray-400 font-normal animate-pulse">{loadingStep}</span>
+                                <span className="text-[10px] text-gray-400 font-normal animate-pulse uppercase tracking-widest mt-1">{loadingStep}</span>
                             </div>
-                        ) : "Optimize Portfolio"}
+                        ) : result ? (
+                            <div className="flex items-center gap-2">
+                                <RefreshCw className="w-5 h-5" />
+                                <span>Re-Run Optimization</span>
+                            </div>
+                        ) : (
+                            <>
+                                <span>Run Optimization Analysis</span>
+                                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                            </>
+                        )}
                     </button>
+                    {!loading && !result && (
+                        <div className="text-center mt-2 text-[10px] text-gray-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                            Press <span className="border border-gray-600 rounded px-1">Space</span> to Run
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* Farm List */}
-            <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                <h3 className="text-sm uppercase text-gray-400 mb-3">Portfolio ({sampleFarms.length} farms)</h3>
-                <div className="space-y-2">
-                    {sampleFarms.map((farm, i) => (
-                        <div
-                            key={i}
-                            className="flex items-center justify-between text-sm py-2 border-b border-white/5 last:border-0"
-                        >
-                            <div className="flex items-center gap-2">
-                                <Factory className="w-4 h-4 text-gray-400" />
-                                <span className="text-white">{farm.name}</span>
-                            </div>
-                            <div className="flex items-center gap-4 text-xs text-gray-500">
-                                <span>{farm.panel_area}m²</span>
-                                <span>{farm.water_usage}L</span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
+            {/* Empty State */}
+            {!result && !loading && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center py-12 border-2 border-dashed border-white/5 rounded-2xl"
+                >
+                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <BrainCircuit className="w-8 h-8 text-gray-600" />
+                    </div>
+                    <h3 className="text-lg font-medium text-white mb-1">Ready to Optimize</h3>
+                    <p className="text-gray-400 text-sm max-w-sm mx-auto">
+                        SolarOS is ready to analyze physics models for {sampleFarms.length} farms. Adjust parameters above and click Run.
+                    </p>
+                </motion.div>
+            )}
 
             {/* Loading Skeletons */}
             {loading && (
                 <div className="space-y-4 animate-pulse">
-                    <div className="h-24 bg-white/5 rounded-lg w-full"></div>
+                    <div className="h-24 bg-white/5 rounded-xl w-full"></div>
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="h-20 bg-white/5 rounded-lg"></div>
-                        <div className="h-20 bg-white/5 rounded-lg"></div>
-                        <div className="h-20 bg-white/5 rounded-lg"></div>
-                        <div className="h-20 bg-white/5 rounded-lg"></div>
+                        <div className="h-24 bg-white/5 rounded-xl"></div>
+                        <div className="h-24 bg-white/5 rounded-xl"></div>
                     </div>
                 </div>
             )}
 
-            {/* Results */}
-            {!loading && result && !result.error && result.selected_farms && (
-                <motion.div
-                    ref={resultsRef} // For PDF export
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="space-y-6"
-                >
-                    {/* Selected Farms */}
-                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-sm uppercase text-emerald-400 font-bold flex items-center gap-2">
+            {/* Results Dashboard */}
+            <AnimatePresence>
+                {!loading && result && !result.error && (
+                    <motion.div
+                        ref={resultsRef}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="space-y-6"
+                    >
+                        {/* Header Controls */}
+                        <div className="flex justify-between items-center">
+                            <h3 className={`text-sm uppercase font-bold flex items-center gap-2 ${theme.primary}`}>
                                 <CheckCircle2 className="w-4 h-4" />
                                 Optimization Complete
                             </h3>
-                            <button
-                                onClick={handleExportPDF}
-                                className="flex items-center gap-1 text-[10px] bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-white transition-colors"
-                            >
-                                <Download className="w-3 h-3" />
-                                Export
-                            </button>
-                        </div>
-                        <div className="text-sm text-gray-300 mb-3">
-                            Based on your {waterBudget.toLocaleString()}L budget, we recommend cleaning {result.selected_farms.length} farms.
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {result.selected_farms?.map((name: string, i: number) => (
-                                <span
-                                    key={i}
-                                    className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/40 rounded-full text-sm text-emerald-300 font-medium"
+                            <div className="flex gap-2">
+                                <button onClick={handleReset} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors">
+                                    <RefreshCw className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={handleExportPDF}
+                                    className="flex items-center gap-2 text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-white transition-colors border border-white/5"
                                 >
-                                    {name}
-                                </span>
-                            ))}
+                                    <Download className="w-3 h-3" />
+                                    Export Report
+                                </button>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* AI Insights ("Fake It" Section) */}
-                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-                        <h3 className="text-sm uppercase text-blue-400 font-bold flex items-center gap-2 mb-3">
-                            <BrainCircuit className="w-4 h-4" />
-                            AI Insights
-                        </h3>
-                        <div className="space-y-2">
-                            {aiInsights.map((insight, i) => (
-                                <div key={i} className="flex items-start gap-2 text-xs text-gray-300">
-                                    <span className="text-blue-400 mt-0.5">•</span>
-                                    <span>{insight}</span>
+                        {/* AI Insights */}
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: 0.2 }}
+                            className={`${theme.bg} ${theme.border} border rounded-xl p-5 relative overflow-hidden`}
+                        >
+                            <div className="absolute top-0 right-0 p-3 opacity-20">
+                                <BrainCircuit className={`w-24 h-24 ${theme.primary}`} />
+                            </div>
+                            <h3 className={`text-sm uppercase font-bold flex items-center gap-2 mb-3 ${theme.primary}`}>
+                                <Info className="w-4 h-4" />
+                                AI Insights
+                            </h3>
+                            <div className="space-y-3 relative z-10">
+                                {aiInsights.map((insight, i) => (
+                                    <motion.div
+                                        key={i}
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: 0.3 + (i * 0.1) }}
+                                        className="flex items-start gap-3 text-sm text-gray-300"
+                                    >
+                                        <span className={`mt-1.5 w-1.5 h-1.5 rounded-full ${theme.button}`} />
+                                        <span>{insight}</span>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        </motion.div>
+
+                        {/* Key Metrics Grid */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <motion.div whileHover={{ y: -2 }} className="bg-white/5 border border-white/10 rounded-xl p-5">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="text-xs uppercase text-gray-400">Net Benefit</span>
+                                    <Tooltip content="Projected revenue increase after deducting cleaning costs">
+                                        <HelpCircle className="w-3 h-3 text-gray-600" />
+                                    </Tooltip>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Comparison Cards (Before/After) */}
-                    <div className="grid grid-cols-2 gap-4">
-                        {/* Before Card */}
-                        <div className="bg-white/5 border border-white/10 rounded-lg p-4 opacity-70">
-                            <div className="text-xs uppercase text-gray-500 mb-1">Current Schedule</div>
-                            <div className="text-sm font-bold text-gray-300 mb-2">Standard Maintenance</div>
-                            <div className="space-y-1">
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-gray-500">Revenue</span>
-                                    <span className="text-gray-400">₹0 (Base)</span>
+                                <div className={`text-3xl font-bold ${theme.primary}`}>
+                                    ₹<CountUp end={result.total_benefit || 0} duration={2.5} separator="," />
                                 </div>
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-gray-500">Water</span>
-                                    <span className="text-gray-400">{waterBudget.toLocaleString()}L</span>
+                            </motion.div>
+
+                            <motion.div whileHover={{ y: -2 }} className="bg-white/5 border border-white/10 rounded-xl p-5">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="text-xs uppercase text-gray-400">Water Usage</span>
+                                    <Tooltip content="Total water required for this optimization schedule">
+                                        <HelpCircle className="w-3 h-3 text-gray-600" />
+                                    </Tooltip>
+                                </div>
+                                <div className="text-3xl font-bold text-blue-400">
+                                    <CountUp end={result.water_used || 0} duration={2.5} separator="," /> L
+                                </div>
+                                <div className="text-xs text-emerald-400 mt-1">
+                                    Saved {((waterBudget - result.water_used) / 1000).toFixed(1)}k L
+                                </div>
+                            </motion.div>
+
+                            <motion.div whileHover={{ y: -2 }} className="bg-white/5 border border-white/10 rounded-xl p-5">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="text-xs uppercase text-gray-400">Energy Gain</span>
+                                    <Tooltip content="Recoverable energy lost to soiling">
+                                        <HelpCircle className="w-3 h-3 text-gray-600" />
+                                    </Tooltip>
+                                </div>
+                                <div className="text-2xl font-bold text-yellow-400">
+                                    <CountUp end={result.total_energy || 0} duration={2.5} separator="," /> kWh
+                                </div>
+                            </motion.div>
+
+                            <motion.div whileHover={{ y: -2 }} className="bg-white/5 border border-white/10 rounded-xl p-5">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="text-xs uppercase text-gray-400">CO₂ Offset</span>
+                                    <Tooltip content="Carbon emissions prevented by efficiency gain">
+                                        <HelpCircle className="w-3 h-3 text-gray-600" />
+                                    </Tooltip>
+                                </div>
+                                <div className="text-2xl font-bold text-green-400">
+                                    <CountUp end={result.total_co2 || 0} duration={2.5} separator="," /> kg
+                                </div>
+                            </motion.div>
+                        </div>
+
+                        {/* Before / After Comparison */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="p-4 rounded-xl border border-white/5 bg-white/5 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+                                <div className="text-xs uppercase text-gray-500 mb-1">Standard Approach</div>
+                                <div className="font-bold text-gray-300">Calendar Based</div>
+                                <div className="mt-2 text-xs text-gray-500">Ignores weather & dust physics</div>
+                            </div>
+                            <div className={`p-4 rounded-xl border ${theme.border} bg-gradient-to-br ${theme.gradient} to-transparent relative overflow-hidden`}>
+                                <div className="absolute top-0 right-0 px-2 py-1 bg-black/20 text-[10px] text-white font-bold rounded-bl-lg">WINNER</div>
+                                <div className="text-xs uppercase text-white/70 mb-1">SolarOS Approach</div>
+                                <div className="font-bold text-white">Physics Based</div>
+                                <div className="mt-2 text-xs text-white/80">Optimized for maximum yield</div>
+                            </div>
+                        </div>
+
+                        {/* Recommendation Strip */}
+                        <motion.div
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            transition={{ delay: 0.5 }}
+                            className="bg-purple-900/20 border border-purple-500/20 rounded-xl p-4 flex items-center justify-between"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400">
+                                    <Calendar className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <div className="text-sm font-bold text-white">Optimal Schedule Found</div>
+                                    <div className="text-xs text-gray-400">Execute on Feb 18, 2026 @ 06:00 AM</div>
                                 </div>
                             </div>
-                        </div>
+                            <div className="text-right">
+                                <div className="text-[10px] text-gray-400 uppercase">ROI</div>
+                                <div className="text-xl font-bold text-purple-400">340%</div>
+                            </div>
+                        </motion.div>
 
-                        {/* After Card (SolarOS) */}
-                        <div className="relative overflow-hidden bg-gradient-to-br from-emerald-900/40 to-black border border-emerald-500/50 rounded-lg p-4 shadow-[0_0_20px_rgba(16,185,129,0.15)]">
-                            <div className="absolute top-0 right-0 p-1">
-                                <span className="bg-emerald-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-bl">RECOMMENDED</span>
-                            </div>
-                            <div className="text-xs uppercase text-emerald-400 mb-1">SolarOS Strategy</div>
-                            <div className="text-sm font-bold text-white mb-2">Optimized Allocation</div>
-                            <div className="space-y-1">
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-gray-400">Revenue</span>
-                                    <span className="text-emerald-400 font-bold">+₹<CountUp end={result.total_benefit || 0} duration={2} separator="," /></span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-gray-400">Water</span>
-                                    <span className="text-blue-400 font-bold"><CountUp end={result.water_used || 0} duration={2} separator="," />L</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Key Metrics */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Droplets className="w-4 h-4 text-blue-400" />
-                                <span className="text-xs uppercase text-gray-400">Water Used</span>
-                            </div>
-                            <div className="text-2xl font-bold text-blue-400">
-                                <CountUp end={result.water_used || 0} duration={2} separator="," /> L
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                                Saved {(waterBudget - (result.water_used || 0)).toLocaleString()}L vs Budget
+                        {/* Selected Farms List */}
+                        <div className="pt-4 border-t border-white/10">
+                            <div className="text-xs text-gray-500 uppercase mb-3">Target Farms</div>
+                            <div className="flex flex-wrap gap-2">
+                                {result.selected_farms?.map((name: string, i: number) => (
+                                    <motion.span
+                                        key={i}
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: 1 }}
+                                        transition={{ delay: 0.6 + (i * 0.1) }}
+                                        className={`px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs text-gray-300`}
+                                    >
+                                        {name}
+                                    </motion.span>
+                                ))}
                             </div>
                         </div>
-
-                        <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <TrendingUp className="w-4 h-4 text-emerald-400" />
-                                <span className="text-xs uppercase text-gray-400">Net Benefit</span>
-                            </div>
-                            <div className="text-2xl font-bold text-emerald-400">
-                                ₹<CountUp end={result.total_benefit || 0} duration={2} separator="," />
-                            </div>
-                        </div>
-
-                        <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Zap className="w-4 h-4 text-yellow-400" />
-                                <span className="text-xs uppercase text-gray-400">Energy Gain</span>
-                            </div>
-                            <div className="text-2xl font-bold text-yellow-400">
-                                <CountUp end={result.total_energy || 0} duration={2} separator="," /> kWh
-                            </div>
-                        </div>
-
-                        <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Leaf className="w-4 h-4 text-green-400" />
-                                <span className="text-xs uppercase text-gray-400">CO₂ Offset</span>
-                            </div>
-                            <div className="text-2xl font-bold text-green-400">
-                                <CountUp end={result.total_co2 || 0} duration={2} separator="," decimals={1} /> kg
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Recommendation Card */}
-                    <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-lg p-4 flex items-center justify-between">
-                        <div>
-                            <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                                <Calendar className="w-4 h-4 text-purple-400" />
-                                Optimal Cleaning Schedule
-                            </h4>
-                            <p className="text-xs text-gray-400 mt-1">Recommended Execution: <span className="text-white font-medium">Feb 18, 2026 (06:00 AM)</span></p>
-                        </div>
-                        <div className="text-right">
-                            <div className="text-[10px] text-gray-400 uppercase">Projected ROI</div>
-                            <div className="text-xl font-bold text-purple-400">340%</div>
-                        </div>
-                    </div>
-                </motion.div>
-            )}
-
-            {result?.error && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-center text-red-400">
-                    {result.error}
-                </div>
-            )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
