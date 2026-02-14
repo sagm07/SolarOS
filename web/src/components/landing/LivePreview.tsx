@@ -8,6 +8,7 @@ import { GlassDropdown } from "../ui/GlassDropdown";
 import { LiveEnginePreview } from "./LiveEnginePreview";
 
 // Updated Interface to match new API response
+// Updated Interface to match new API response
 interface AnalysisData {
     recommendation: "CLEAN" | "WAIT";
     cleaning_date: string | null;
@@ -23,6 +24,11 @@ interface AnalysisData {
         reason?: string;
         reasons?: string[]; // New: Bullet points for decision logic
         optimization_score: number;
+    };
+    confidence_interval?: {
+        p10_benefit: number;
+        p90_benefit: number;
+        uncertainty_spread_kwh: number;
     };
 }
 
@@ -87,7 +93,7 @@ export function LivePreview() {
 
             setData(json);
         } catch (e) {
-            // Updated Fallback with SSES
+            // Updated Fallback with SSES & Confidence
             setData({
                 recommendation: "CLEAN",
                 cleaning_date: "2024-12-15",
@@ -102,6 +108,11 @@ export function LivePreview() {
                     model: "Dynamic Programming (Offline)",
                     reason: "Simulated fallback data due to connection error.",
                     optimization_score: 100.0
+                },
+                confidence_interval: {
+                    p10_benefit: 2100.0,
+                    p90_benefit: 2800.0,
+                    uncertainty_spread_kwh: 45.5
                 }
             });
         } finally {
@@ -316,13 +327,15 @@ export function LivePreview() {
 
                                     {/* Decision Logic (Deep Explainability) - NEW */}
                                     <div className="mb-6 bg-black/30 rounded-xl p-4 border border-white/10">
-                                        <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase mb-3">
-                                            <Brain className="w-4 h-4" />
-                                            Decision Intelligence
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase">
+                                                <Brain className="w-4 h-4" />
+                                                Decision Intelligence
+                                            </div>
                                         </div>
 
                                         {data.explanation?.reasons && data.explanation.reasons.length > 0 ? (
-                                            <ul className="space-y-2">
+                                            <ul className="space-y-2 mb-4">
                                                 {data.explanation.reasons.map((r, i) => (
                                                     <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
                                                         <span className="mt-1.5 w-1 h-1 rounded-full bg-emerald-500/50 shrink-0" />
@@ -331,9 +344,26 @@ export function LivePreview() {
                                                 ))}
                                             </ul>
                                         ) : (
-                                            <p className="text-gray-300 text-sm leading-relaxed">
+                                            <p className="text-gray-300 text-sm leading-relaxed mb-4">
                                                 {data.explanation?.reason || "Optimization model determined this is the most cost-effective action."}
                                             </p>
+                                        )}
+
+                                        {/* Confidence Interval Visualization */}
+                                        {data.confidence_interval && (
+                                            <div className="mt-3 pt-3 border-t border-white/5">
+                                                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                                    <span>Confidence Interval (90%)</span>
+                                                    <span>Risk-Adjusted Rev.</span>
+                                                </div>
+                                                <div className="flex justify-between items-center bg-white/5 rounded px-2 py-1">
+                                                    <span className="text-gray-400 text-xs">P10: ₹{data.confidence_interval.p10_benefit.toLocaleString()}</span>
+                                                    <div className="h-1 w-12 bg-gray-700 rounded-full overflow-hidden mx-2">
+                                                        <div className="h-full bg-emerald-500/50 w-2/3 mx-auto"></div>
+                                                    </div>
+                                                    <span className="text-emerald-300 text-xs font-bold">P90: ₹{data.confidence_interval.p90_benefit.toLocaleString()}</span>
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
 
