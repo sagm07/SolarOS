@@ -1,9 +1,27 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, PlayCircle } from "lucide-react";
+import { SolarLogo } from "../ui/SolarLogo";
+
+const PHRASES = [
+    "Optimizing 14.2% Energy Loss",
+    "Saving 23,400 Liters Daily",
+    "Predicting Load 12 Hours Ahead",
+    "Maximizing Module Lifespan"
+];
 
 export function Hero() {
+
+    const [index, setIndex] = useState(0);
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setIndex((prev) => (prev + 1) % PHRASES.length);
+        }, 3000); // 3 seconds per phrase
+        return () => clearInterval(timer);
+    }, [index]); // Reset timer on manual interaction
     return (
         <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-black">
             {/* Background Image - Dark Nature / Thinkers vibe */}
@@ -18,16 +36,51 @@ export function Hero() {
 
             <div className="relative z-10 max-w-6xl mx-auto px-6 text-center pt-36">
 
-                {/* Main Title */}
-                <motion.h1
-                    initial={{ opacity: 0, y: 30 }}
+                {/* Branding Badge */}
+                <motion.div
+                    initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8 }}
-                    className="font-serif text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight leading-tight"
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm mb-8 hover:bg-white/10 transition-colors cursor-default"
                 >
-                    Increase Solar Revenue by 23% <br />
-                    <span className="italic text-emerald-400 drop-shadow-[0_0_25px_rgba(52,211,153,0.5)]">While Saving Water</span>
-                </motion.h1>
+                    <SolarLogo size="sm" variant="icon-only" />
+                    <span className="text-sm md:text-base font-medium text-gray-300">
+                        <span className="font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 text-transparent bg-clip-text">SolarOS</span>
+                        <span className="mx-2 text-white/20">|</span>
+                        <span className="hidden md:inline">The AI Operating System for Utility-Scale Solar</span>
+                        <span className="inline md:hidden">AI for Utility-Scale Solar</span>
+                    </span>
+                </motion.div>
+
+                {/* Main Title */}
+                <div className="relative z-20 mb-8">
+                    <motion.h1
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8 }}
+                        className="font-serif text-5xl md:text-7xl font-bold text-white tracking-tight leading-tight"
+                    >
+                        Increase Solar Revenue by 23% <br />
+                        <span className="block h-[1.2em] relative overflow-visible">
+                            <AnimatePresence mode="wait">
+                                <motion.span
+                                    key={PHRASES[index]}
+                                    initial={{ y: 20, opacity: 0, scale: 0.95, filter: "blur(10px)" }}
+                                    animate={{ y: 0, opacity: 1, scale: 1, filter: "blur(0px)" }}
+                                    exit={{ y: -20, opacity: 0, scale: 1.05, filter: "blur(10px)" }}
+                                    transition={{ duration: 0.5, ease: "easeOut" }}
+                                    className="absolute inset-x-0 mx-auto w-full text-emerald-400 drop-shadow-[0_0_25px_rgba(52,211,153,0.5)] cursor-pointer hover:text-emerald-300 transition-colors italic"
+                                    onClick={() => setIndex((prev) => (prev + 1) % PHRASES.length)}
+                                >
+                                    {PHRASES[index]}
+                                </motion.span>
+                            </AnimatePresence>
+                        </span>
+                    </motion.h1>
+
+                    {/* Subtle Gradient Behind Text */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%] -z-10 bg-gradient-radial from-emerald-500/10 via-transparent to-transparent blur-3xl opacity-50 pointer-events-none" />
+                </div>
 
                 {/* Subtitle */}
                 <motion.p

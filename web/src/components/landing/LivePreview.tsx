@@ -5,6 +5,7 @@ import { CheckCircle2, AlertCircle, Loader2, Play, Brain, TrendingUp, Leaf, Info
 import { useState } from "react";
 import { clsx } from "clsx";
 import { GlassDropdown } from "../ui/GlassDropdown";
+import { LiveEnginePreview } from "./LiveEnginePreview";
 
 // Updated Interface to match new API response
 interface AnalysisData {
@@ -380,15 +381,10 @@ export function LivePreview() {
                         )}
 
                         {/* EMPTY STATE */}
+                        {/* EMPTY STATE - Live Preview */}
                         {!loading && !data && (
-                            <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-50">
-                                <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-6">
-                                    <Play className="w-10 h-10 text-white/20" />
-                                </div>
-                                <h3 className="text-xl text-white font-serif mb-2">Ready to Optimize?</h3>
-                                <p className="text-gray-500 max-w-sm">
-                                    Adjust the parameters on the left and click &quot;Run Analysis&quot; to see the engine in action.
-                                </p>
+                            <div className="h-full flex flex-col items-center justify-center">
+                                <LiveEnginePreview />
                             </div>
                         )}
                     </AnimatePresence>

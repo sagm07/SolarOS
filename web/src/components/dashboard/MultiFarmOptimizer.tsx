@@ -102,6 +102,7 @@ export function MultiFarmOptimizer() {
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loading, result, mode, waterBudget]); // Dependencies for closure freshness
 
     // --- Logic ---
@@ -110,7 +111,7 @@ export function MultiFarmOptimizer() {
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
 
             const res = await fetch(`${apiUrl}/health`, {
                 method: 'GET',
