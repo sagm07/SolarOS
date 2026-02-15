@@ -1,30 +1,13 @@
 
 import pandas as pd
 import numpy as np
+from datetime import timedelta
 
 # Rain Intelligence Constants
+# NOTE: Physics constants (GAMMA) are now centralized in degradation_model.py
+# We keep threshold here for forecasting decisions
 RAIN_THRESHOLD_MM = 2.0
 RAIN_WINDOW_DAYS = 2
-CLEANING_EFFICIENCY_GAMMA = 0.4  # Gamma coefficient for rain cleaning (0.2-0.6 typical)
-
-def apply_rain_cleaning(dust_level, rain_amount_mm):
-    """
-    Apply physics-based rain cleaning to current dust level.
-    
-    Formula:
-    Dust_new = Dust_current * (1 - gamma * RainAmount)
-    
-    We clip the cleaning factor so rain doesn't make dust negative.
-    Gamma * RainAmount represents the fraction of dust removed.
-    For Gamma=0.4, 2.5mm of rain -> 1.0 (100%) removal?
-    No, usually it's exponential or asymptotic. 
-    But for this approved simplified model: linear reduction.
-    We cap reduction at 95% for a single rain event to be realistic (never perfectly clean).
-    """
-    reduction_factor = CLEANING_EFFICIENCY_GAMMA * rain_amount_mm
-    reduction_factor = min(reduction_factor, 0.95) # Cap at 95% removal
-    
-    return dust_level * (1.0 - reduction_factor)
 
 def check_rain_forecast_wait(df, current_date=None, window_days=RAIN_WINDOW_DAYS, threshold_mm=RAIN_THRESHOLD_MM):
     """
@@ -59,14 +42,13 @@ def check_rain_forecast_wait(df, current_date=None, window_days=RAIN_WINDOW_DAYS
     upcoming_rain = window_df['precipitation'].sum()
     
     if upcoming_rain >= threshold_mm:
-        # Estimate natural cleaning
-        reduction_est = min(CLEANING_EFFICIENCY_GAMMA * upcoming_rain, 0.95)
+        # We need to import the GAMMA from degradation model to be consistent, or just use a reference value for estimation
+        # For forecast estimation, 0.4 is fine as an approximation
+        EST_GAMMA = 0.4
+        reduction_est = min(EST_GAMMA * upcoming_rain, 0.95)
         
-        # Placeholder for water saved and sustainability boost estimates
-        # These would typically depend on specific system parameters (e.g., panel area, cleaning water usage)
-        # For this example, we'll use illustrative values.
-        estimated_water_saved_liters = upcoming_rain * 0.5 # Example: 0.5 liters saved per mm of rain
-        net_sustainability_score_boost = reduction_est * 100 # Example: 100 points for full reduction
+        estimated_water_saved_liters = upcoming_rain * 0.5 
+        net_sustainability_score_boost = reduction_est * 100 
         
         reason = {
             "decision": "WAIT",

@@ -26,13 +26,18 @@ def calculate_energy_metrics(df, panel_area=100.0, cleaning_dates=None, referenc
             - actual_energy_kwh
             - recoverable_energy_kwh
     """
-    # Constants
+    # FROZEN PHYSICS CONSTANTS (DO NOT CHANGE during ML Training)
+    # These represent the "Ideal World" or "datasheet" performance.
     BASE_EFFICIENCY = 0.20
-    TEMP_COEFF = 0.004   # 0.4% per degree C above 25°C → fraction loss
+    TEMP_COEFF = 0.004        # 0.4% per °C above 25°C
     REF_TEMP = 25.0
-    DUST_ACCUMULATION_RATE = 0.15   # 15% over 30 days → fraction loss
+    DUST_ACCUMULATION_RATE = 0.15  # 15% loss over 30 days (Linear approximation)
     DAYS_IN_PERIOD = 30.0
-    ANNUAL_DEGRADATION_RATE = 0.005   # 0.5% per year → fraction loss per year
+    ANNUAL_DEGRADATION_RATE = 0.005 # 0.5% per year
+    
+    # Rain Cleaning Physics (Frozen)
+    RAIN_CLEANING_GAMMA = 0.4      # Dust reduction efficiency per mm of rain
+    RAIN_THRESHOLD = 0.1           # Minimum rain to have any effect
 
     # Ensure datetime is datetime type
     if not pd.api.types.is_datetime64_any_dtype(df['datetime']):
@@ -50,28 +55,19 @@ def calculate_energy_metrics(df, panel_area=100.0, cleaning_dates=None, referenc
     df['temp_loss'] = df['temperature_loss']  # alias for compatibility
 
     # 3. Dust Level (fraction 0–1): linear 0% to 15% over 30 days since last cleaning, MINUS rain cleaning
-    # We need to iterate chronologically to accumulate dust and clean with rain.
     
     # Pre-calculate days since cleaning for manual cleans
     manual_clean_mask = pd.Series(False, index=df.index)
     if cleaning_dates:
         clean_dt_set = set([pd.to_datetime(d).date() for d in cleaning_dates])
-        # Mark cleaning events
         manual_clean_mask = df['datetime'].dt.date.isin(clean_dt_set)
 
     # Initialize dust array
     dust_levels = np.zeros(len(df))
-    
-    # Simulation loop for dust
-    # We assume hourly steps
     current_dust = 0.0
     
-    # 15% over 30 days = 0.005 per day = 0.000208 per hour
     HOURLY_DUST_RATE = DUST_ACCUMULATION_RATE / (DAYS_IN_PERIOD * 24)
-    RAIN_CLEANING_GAMMA = 0.4  # Matches rain_model.py, but we inline here for speed or import?
-    # Let's import if possible, otherwise define.
-    # To keep it self-contained if module not found:
-    RAIN_GAMMA = 0.4
+    RAIN_GAMMA = RAIN_CLEANING_GAMMA
 
     prev_time = start_time
     

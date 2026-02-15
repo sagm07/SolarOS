@@ -1,101 +1,69 @@
 import numpy as np
 import pandas as pd
-import pickle
 import os
-from datetime import datetime
+from feature_engineering import FeatureEngineer
+from residual_model import ResidualLearner
 
 class HybridCorrector:
     """
-    Hybrid Intelligence Layer.
-    Combines Physics-Based Model (PBM) with Data-Driven Machine Learning (DDML).
+    Hybrid Intelligence Layer (v2.0 - Trained XGBoost).
     
-    Formula:
-    Final_Prediction = Physics_Output + ML_Residual_Correction
-    
-    The ML model learns the *errors* of the physics model (e.g., due to local microclimate, 
-    organic soiling, sensor drift) rather than trying to learn physics from scratch.
+    Orchestrates the pipeline:
+    1. Physics Model Output -> 
+    2. Feature Engineering -> 
+    3. Residual Prediction (XGBoost) -> 
+    4. Final Hybrid Prediction
     """
     
     def __init__(self, model_path="ml_residual_model.pkl"):
-        self.model_path = model_path
-        self.model = None
-        self.load_model()
+        self.fe = FeatureEngineer()
+        self.learner = ResidualLearner(model_path)
         
-    def load_model(self):
+    def train_model(self, physics_df: pd.DataFrame, truth_df: pd.DataFrame):
         """
-        Loads the pre-trained ML residual model.
-        In a real scenario, this would load an XGBoost/LightGBM model.
-        For this implementation, we initialize a 'Mock' model if none exists.
-        """
-        if os.path.exists(self.model_path):
-            try:
-                with open(self.model_path, 'rb') as f:
-                    self.model = pickle.load(f)
-            except Exception as e:
-                print(f"[HybridCorrector] Warning: Failed to load model: {e}")
-        
-        if self.model is None:
-            # print("[HybridCorrector] Initializing Synthetic Residual Model (Cold Start)")
-            self.model = self._mock_train()
-
-    def _mock_train(self):
-        """
-        Simulates training a residual model.
-        In reality, this would train on (Historical_Actual - Historical_Physics).
-        """
-        return "Thinking_Machine_v1"
-
-    def predict_residual(self, features: pd.DataFrame) -> np.ndarray:
-        """
-        Predicts the *error* of the physics model.
+        Trains the internal residual model.
         
         Args:
-            features: DataFrame with ['irradiance', 'temperature', 'humidity', 'wind_speed', 'dust_level']
-            
-        Returns:
-            np.ndarray: Predicted residual (kWh correction).
+            physics_df: DataFrame with physics predictions.
+            truth_df: DataFrame with 'true_residual_kwh' (Target).
         """
-        # --- SYNTHETIC ML LOGIC (for demonstration) ---
-        # Real ML would use self.model.predict(features)
+        # Create Features (X)
+        X = self.fe.create_features(physics_df, is_training=True)
         
-        # 1. Temperature Non-Linearity Correction
-        # Physics model uses linear coeff. Real panels behave non-linearly at extremes.
-        temp_correction = (features['temperature'] - 25.0) ** 2 * -0.001
+        # Target (y)
+        y = truth_df['true_residual_kwh']
         
-        # 2. Low Light Performance Correction
-        # Physics model might under-estimate diffuse light performance
-        low_light_boost = np.where(features['irradiance'] < 200, 5.0, 0.0)
+        # Train
+        self.learner.train(X, y)
         
-        # 3. Micro-climate Dust Correction
-        # If 'humidity' is high (simulated), stickiness increases soiling impact (negative residual)
-        # We don't have humidity in base data, simulating random micro-climate noise
-        random_noise = np.random.normal(0, 2.0, size=len(features))
-        
-        # Total Residual (kWh)
-        # Scaling relatively small to simply "nudge" the physics model
-        residual = temp_correction + low_light_boost + random_noise
-        
-        return residual
-
     def correct_physics_prediction(self, physics_df: pd.DataFrame) -> pd.DataFrame:
         """
         Applies ML correction to the physics-based DataFrame.
         """
         df = physics_df.copy()
         
-        # Prepare features for ML
-        # In prod, we'd add more features here (wind, humidity, etc)
-        features = df[['irradiance', 'temperature', 'dust_level']].copy()
+        # 1. Create Features
+        X = self.fe.create_features(df, is_training=False)
         
-        # Get Residuals
-        residuals = self.predict_residual(features)
+        # 2. Predict Residuals (with Uncertainty)
+        preds = self.learner.predict(X)
         
-        # Apply Correction
-        # Final = Physics + Residual
-        df['ml_residual_kwh'] = residuals
+        # 3. Apply Correction
+        # Final = Physics + Predicted_Residual
+        df['ml_residual_kwh'] = preds['residual_pred']
         df['hybrid_energy_kwh'] = df['actual_energy_kwh'] + df['ml_residual_kwh']
         
-        # Sanity Clamp - Energy cannot be negative
+        # Uncertainty Columns
+        df['uncert_p10_kwh'] = df['actual_energy_kwh'] + preds['p10']
+        df['uncert_p90_kwh'] = df['actual_energy_kwh'] + preds['p90']
+        
+        # Sanity Clamp
         df['hybrid_energy_kwh'] = df['hybrid_energy_kwh'].clip(lower=0.0)
+        df['uncert_p10_kwh'] = df['uncert_p10_kwh'].clip(lower=0.0)
+        df['uncert_p90_kwh'] = df['uncert_p90_kwh'].clip(lower=0.0)
         
         return df
+
+    def get_model_insights(self):
+        """Returns feature importances if available."""
+        return self.learner.get_feature_importance()

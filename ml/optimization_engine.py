@@ -35,9 +35,28 @@ class OptimizationEngine:
         days = len(forecast_df)
         max_days_dirty = 60 
         
+        
         # Check for precipitation data
         has_rain_data = 'precipitation' in forecast_df.columns
         rain_vec = forecast_df['precipitation'].values if has_rain_data else np.zeros(days)
+
+        # UNCERTAINTY FACTOR (New in v3)
+        # If model is uncertain (wide P90-P10), be more conservative with spending money on cleaning.
+        # We assume 'uncert_p90_kwh' and 'uncert_p10_kwh' might exist if passed from Hybrid v2.
+        has_uncertainty = 'uncert_p90_kwh' in forecast_df.columns
+        uncertainty_penalty = 0.0
+        
+        if has_uncertainty:
+            # Simple measure: Sum of daily spread
+            daily_spread = forecast_df['uncert_p90_kwh'] - forecast_df['uncert_p10_kwh']
+            avg_spread = daily_spread.mean()
+            # If spread is > 10% of energy, it's 'High Uncertainty'
+            # We can dampen the projected rewards.
+            # For DP, we'll apply a scalar to the Energy Reward.
+            # Higher uncertainty -> Lower confidence in revenue -> Discount it.
+            # Discount factor = 1.0 - (Spread / MaxEnergy * weight)
+            # Simplified:
+            uncertainty_penalty = 0.05 # Flat 5% discount on gains if using ML
 
         dp = np.full((days + 1, max_days_dirty + 1), -np.inf)
         parent = {} 
@@ -45,9 +64,29 @@ class OptimizationEngine:
         start_dirtiness = 0 
         dp[0][start_dirtiness] = 0.0
         
-        clean_energy_series = (forecast_df['actual_energy_kwh'] + forecast_df['recoverable_energy_kwh']).values
+        # Use Hybrid Energy if available, else Physics Actual
+        energy_col = 'hybrid_energy_kwh' if 'hybrid_energy_kwh' in forecast_df.columns else 'actual_energy_kwh'
+        
+        # For 'Potential' (Clean state), we need to estimate what it WOULD be.
+        # Recoverable = Ideal - Actual.
+        # So Potential = Actual + Recoverable. (Matches logic).
+        # But Hybrid model gives us 'Predicted Actual'.
+        # We need 'Predicted Ideal' or 'Predicted Clean'. 
+        # Hybrid Correction applies to the *specific condition*.
+        # If we clean, dust=0. The Hybrid Model should predict for dust=0.
+        # Ideally, we'd run the model for both scenarios. 
+        # For Optimization Speed, we assume:
+        # Potential_Hybrid = Hybrid_Actual + Physics_Recoverable
+        # This assumes ML residual is independent of Dust (mostly true, it's temp/spectral).
+        
+        current_actual_vec = forecast_df[energy_col].values
+        physics_recoverable_vec = forecast_df['recoverable_energy_kwh'].values
+        
+        # Clean Energy Series = Current + Physics Recoverable (Approximation)
+        clean_energy_series = current_actual_vec + physics_recoverable_vec
+        
         avg_daily_loss = 0.005 # 0.5% / day
-        rain_cleaning_gamma = 0.4 # Same as degradation model
+        rain_cleaning_gamma = 0.4 
         
         for day in range(days):
             potential_energy = clean_energy_series[day]
