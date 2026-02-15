@@ -180,3 +180,64 @@ class OptimizationEngine:
             "total_net_value": max_total_reward,
             "horizon_days": days
         }
+    def calculate_confidence_intervals(self, schedule: List[int], forecast_df: pd.DataFrame) -> Dict:
+        """
+        Calculates P10, P50, and P90 net values for a given schedule.
+        """
+        days = len(forecast_df)
+        cleaning_dates = set(schedule)
+        
+        # Columns
+        col_p50 = 'hybrid_energy_kwh' if 'hybrid_energy_kwh' in forecast_df.columns else 'actual_energy_kwh'
+        col_p10 = 'uncert_p10_kwh' if 'uncert_p10_kwh' in forecast_df.columns else col_p50
+        col_p90 = 'uncert_p90_kwh' if 'uncert_p90_kwh' in forecast_df.columns else col_p50
+        
+        physics_recoverable = forecast_df['recoverable_energy_kwh'].values
+        
+        scenarios = {
+            'p10': forecast_df[col_p10].values,
+            'p50': forecast_df[col_p50].values,
+            'p90': forecast_df[col_p90].values
+        }
+        
+        results = {}
+        
+        avg_daily_loss = 0.005
+        
+        for name, energy_vec in scenarios.items():
+            # Construct "Clean Energy" potential for this scenario
+            # Potential = Predicted Actual + Physics Recoverable
+            # (Assuming recovered amount is roughly constant physically)
+            potential_energy_vec = energy_vec + physics_recoverable
+            
+            total_value = 0.0
+            dirty_days = 0 
+            
+            for day in range(days):
+                # 1. Update Dirty State
+                if day in cleaning_dates:
+                    dirty_days = 0
+                else:
+                    # Rain Check
+                    rain_mm = forecast_df.iloc[day].get('precipitation', 0.0)
+                    if rain_mm > 0.1:
+                        reduction = min(0.4 * rain_mm, 0.95)
+                        dirty_days = int(dirty_days * (1.0 - reduction))
+                    else:
+                        dirty_days += 1
+                
+                # 2. Calculate Efficiency
+                efficiency_loss = dirty_days * avg_daily_loss
+                realized_efficiency = max(0.9, 1.0 - efficiency_loss)
+                
+                # 3. Calculate Energy
+                daily_energy = potential_energy_vec[day] * realized_efficiency
+                
+                # 4. Calculate Reward
+                is_clean_day = (day in cleaning_dates)
+                reward = self._calculate_day_reward(daily_energy, is_cleaning_day=is_clean_day)
+                total_value += reward
+            
+            results[name] = total_value
+            
+        return results

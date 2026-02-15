@@ -143,89 +143,100 @@ def optimize_farm_portfolio(request: OptimizationRequest):
         # Global Physics Constants
         # We use the request properties to override defaults if needed
         
+        # 0. Cluster Statistics (for Anomaly Detection)
+        dust_rates = [f.dust_rate for f in request.farms]
+        avg_dust = np.mean(dust_rates)
+        std_dust = np.std(dust_rates) if len(dust_rates) > 1 else 1.0
+        
+        ai_insights = []
+
         for farm in request.farms:
-            # 1. Fetch Data (mock or real? Real is better but slow)
-            # Let's use the default fetch (Chennai) for all for speed if lat/long are same
-            # Or actually fetch.
-            # Warning: 4 fetches might take 10s.
-            
-            # Optimization: 
+            # 1. Fetch Data
             df = fetch_nasa_power_data(latitude=farm.latitude, longitude=farm.longitude, days=30)
             
             if df.empty:
-                continue # Skip this farm
+                continue 
             
             # 2. Physics & ML
-            # Initialize Hybrid Model (Pre-trained?)
-            # We should load the trained model once globally if possible.
-            # But `HybridCorrector` loads it in __init__.
-            train_cutoff = int(len(df) * 0.7)
-            
-            # Physics
-            # Adjust panel area valid for this specific farm logic?
-            # degradation_model uses 100m2 by default. We need to scale the *Energy* results.
-            # The model returns energy for 100m2.
-            # We can scale the final outputs by (farm.panel_area / 100.0)
             scaling_factor = farm.panel_area / 100.0
             
             df_physics = calculate_energy_metrics(df.copy())
             
-            # ML Correction
-            hybrid_model = HybridCorrector() # Loads default model
-            # Note: Model was trained on *some* data. Is it valid here?
-            # Ideally we retrain per farm. For demo, we use the pre-trained generic model.
-            
+            hybrid_model = HybridCorrector() 
             df_final = hybrid_model.correct_physics_prediction(df_physics)
             
             # 3. Optimization
-            # Adjust costs based on farm/request params
             optimizer = OptimizationEngine(
                 electricity_price=farm.electricity_price,
-                cleaning_cost=1500, # Base cost
+                cleaning_cost=1500, 
                 water_price_per_liter=0.05,
                 water_usage_per_clean=farm.water_usage
             )
             
             opt_res = optimizer.optimize_cleaning_schedule(df_final)
             
+            # 3b. Uncertainty Quantification
+            # Calculate P10/P90 Confidence Intervals for this schedule
+            confidence_intervals = optimizer.calculate_confidence_intervals(opt_res['cleaning_dates'], df_final)
+            
+            p10_val = confidence_intervals['p10'] * scaling_factor
+            p50_val = confidence_intervals['p50'] * scaling_factor
+            p90_val = confidence_intervals['p90'] * scaling_factor
+            
             # 4. Extract Metrics
-            # Scale energy/benefit by size
-            # The optimizer works on the provided DataFrame which is for 100m2.
-            # So the 'total_net_value' is for 100m2.
+            net_val_scaled = p50_val # Use P50 as the main metric
             
-            # Net Value (Rupees)
-            net_val_unit = opt_res['total_net_value']
-            net_val_scaled = net_val_unit * scaling_factor
-            
-            # Energy (kWh)
-            # Sum of *Hybrid* energy for the optimized schedule?
-            # The optimizer returns 'total_net_value'. 
-            # We need total energy.
-            # Let's approximate: Net Value ~ (Energy * Price) - Costs
-            # But simpler: Just sum the energy column for the full period?
-            # No, optimization changes the *realized* energy by cleaning.
-            # We'll stick to the "Potential Benefit" metric for ranking.
-            
-            # Let's calculate a "Score" for this farm based on the mode
+            # Score Calculation
             score = 0
             if request.mode == "PROFIT":
                 score = net_val_scaled
             elif request.mode == "CARBON":
-                score = net_val_scaled * 0.5 # Proxy
+                score = net_val_scaled * 0.5 
             elif request.mode == "WATER_SCARCITY":
-                # Ranking by water efficiency?
                 score = net_val_scaled / (farm.water_usage + 1)
             
             results.append({
                 "farm": farm,
                 "score": score,
                 "net_benefit": net_val_scaled,
-                "water_needed": farm.water_usage * len(opt_res['cleaning_dates']), # Total water for schedule
+                "water_needed": farm.water_usage * len(opt_res['cleaning_dates']),
                 "cleaning_dates": opt_res['cleaning_dates']
             })
+            
+            # 5. Generate "Real AI" Insights
+            
+            # Insight A: Probabilistic ROI
+            cost_of_action = len(opt_res['cleaning_dates']) * (1500 + (farm.water_usage * 0.05))
+            if cost_of_action > 0:
+                roi_p50 = (p50_val / cost_of_action) * 100
+                roi_p10 = (p10_val / cost_of_action) * 100
+                roi_p90 = (p90_val / cost_of_action) * 100
+                
+                # Only show if ROI is significantly positive
+                if roi_p50 > 20: 
+                    ai_insights.append(f"Expected ROI for {farm.name}: {roi_p50:.0f}% (P10: {roi_p10:.0f}% - P90: {roi_p90:.0f}%)")
+            
+            # Insight B: Dust Anomaly (Cluster Analysis)
+            if std_dust > 0:
+                z_score = (farm.dust_rate - avg_dust) / std_dust
+                if z_score > 1.0:
+                    ai_insights.append(f"{farm.name} Dust Rate is {z_score:.1f}σ above portfolio mean (High Soiling Risk).")
+                elif z_score < -1.0:
+                    ai_insights.append(f"{farm.name} is {abs(z_score):.1f}σ cleaner than average (Low Maintenance).")
 
-        # 5. Portfolio Selection (Knapsack-ish)
-        # Sort by Score
+            # Insight C: Rain Value (Value of Deferral)
+            # If the schedule puts the first clean > 3 days away, and there is rain coming...
+            next_clean_idx = opt_res['cleaning_dates'][0] if opt_res['cleaning_dates'] else -1
+            if next_clean_idx > 2: # Scheduled for > 2 days away
+                # Check if rain is the reason?
+                upcoming_rain = df_final['precipitation'].iloc[:next_clean_idx].sum()
+                if upcoming_rain > 5.0:
+                    saved_cost = 1500 + (farm.water_usage * 0.05)
+                    confidence = min(100, upcoming_rain * 10) # Mock confidence based on volume
+                    ai_insights.append(f"Deferring cleaning on {farm.name} saves ₹{saved_cost:.0f} (Rain Probability: {confidence:.0f}%).")
+
+
+        # 6. Portfolio Selection
         results.sort(key=lambda x: x["score"], reverse=True)
         
         current_water = 0
@@ -241,13 +252,18 @@ def optimize_farm_portfolio(request: OptimizationRequest):
         
         total_co2 = total_energy * 0.7
         
+        # Limit insights to top 3-4 to avoid clutter
+        import random
+        selected_insights = ai_insights[:4] if len(ai_insights) > 4 else ai_insights
+        
         return {
             "selected_farms": selected_farms,
             "water_used": total_water,
             "total_benefit": total_benefit,
             "total_energy": total_energy,
             "total_co2": total_co2,
-            "farm_details": [] # Could populate
+            "farm_details": [],
+            "ai_insights": selected_insights
         }
         
     except Exception as e:
