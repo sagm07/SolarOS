@@ -83,7 +83,7 @@ export function LiveEnginePreview() {
                                 Ready to Optimize?
                             </h3>
                             <p className="text-gray-400">
-                                Adjust the parameters on the left and click "Run Analysis" to see the engine in action.
+                                Adjust the parameters on the left and click &quot;Run Analysis&quot; to see the engine in action.
                             </p>
                         </div>
 
