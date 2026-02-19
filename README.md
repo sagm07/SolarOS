@@ -245,7 +245,7 @@ Contributions, issues, and feature requests are welcome!
 
 ## 📬 Contact
 
-**Project Link:** [https://github.com/yourusername/SolarOS](https://github.com/yourusername/SolarOS)
+**Project Link:** [https://github.com/yourusername/SolarOS](https://github.com/sagm07/SolarOS)
 
 ---
 
